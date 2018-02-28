@@ -8,7 +8,8 @@
               = :
               type
               val
-              Int ->]
+              Int -> ∀
+              λ Λ]
 
   [program (code:line toplevel-binding
                       ...)]
@@ -36,7 +37,8 @@
                   (val name : T)]
 
   [component-def (type name = T)
-                 (val name = E)]
+                 (val name = E)
+                 (val name : T = E)]
 
   [T T*
      (∀ (name ...) T*)]
@@ -46,7 +48,8 @@
 
   [E integer
      (E E)
-     (λ ({name : T*} ...) E)]
+     (λ ({name : T*} ...) E)
+     (Λ (name ...) E)]
   
   )
 

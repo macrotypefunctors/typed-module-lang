@@ -1,3 +1,5 @@
 #lang info
-(define collection 'multi)
-(define deps '("base"))
+
+(define scribblings
+  '(["scribblings/grammar.scrbl" () experimental "macrotypefunctors"]))
+

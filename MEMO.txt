@@ -1,0 +1,16 @@
+To:      Matthias Felleisen, boss
+From:    Alex Knauth, Milo Turner
+Subject: Module Functors as Macros
+
+<Thesis>
+
+
+<Language Specification>
+
+The specification for the prototype language can be found on our
+GitHub repository.
+
+
+<Milestones>
+
+  -

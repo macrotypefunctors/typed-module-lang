@@ -2,54 +2,62 @@
 
 @title{Grammar}
 
+@bold{Core Language}
+
 @(racketgrammar*
-  #:literals [define-signature sig
-              define-module mod
-              = :
-              type
-              val
-              Int -> ∀
-              λ Λ]
+  #:literals [= : Int -> ∀ λ Λ let type val]
 
-  [program (code:line toplevel-binding
-                      ...)]
+  [core-defn
+   (type id = core-type)
+   (val id : core-type = core-expr)]
 
-  [toplevel-binding (define-signature name = sig-expr)
-                    (define-module name = mod-expr)]
+  [core-type
+   Int
+   (-> core-type ... core-type)
+   (∀ (id ...) core-type)]
 
-  [sig-expr
-   name
-   (sig component-decl ...)
-   (Π ([name : sig-expr]) sig-expr)
-   (let ([name mod-expr]) sig-expr)
-   ]
+  [core-expr
+   integer
+   (core-expr core-expr ...)
+   (λ ({id : core-type} ...) core-expr)
+   (Λ (id ...) core-expr)
+   (let ([id core-expr] ...) core-expr)]
 
-  [mod-expr
-   name
-   (mod component-def ...)
-   (seal mod-expr :> sig-expr)
-   (mod-expr mod-expr)
-   (λ ({name : sig-expr}) mod-expr)
-   (let ([name mod-expr]) mod-expr)]
-
-  [component-decl (type name)
-                  (type name = T)
-                  (val name : T)]
-
-  [component-def (type name = T)
-                 (val name = E)
-                 (val name : T = E)]
-
-  [T T*
-     (∀ (name ...) T*)]
-
-  [T* Int
-      (-> T* ... T*)]
-
-  [E integer
-     (E E)
-     (λ ({name : T*} ...) E)
-     (Λ (name ...) E)]
-  
   )
 
+@bold{Module Language}
+
+@(racketgrammar*
+  #:literals [= :
+              define-module mod λ seal :>
+              define-signature sig Π
+              type val let]
+
+  [program
+   (code:line toplevel-binding
+              ...)]
+
+  [toplevel-binding
+   (define-signature id = sig-expr)
+   (define-module id = mod-expr)]
+
+  [sig-expr
+   id
+   (sig sig-component ...)
+   (Π ({id : sig-expr}) sig-expr)
+   (let ([id mod-expr]) sig-expr)]
+
+  [mod-expr
+   id
+   (mod core-def ...)
+   (seal mod-expr :> sig-expr)
+   (mod-expr mod-expr)
+   (λ ({id : sig-expr}) mod-expr)
+   (let ([id mod-expr]) mod-expr)]
+
+  [sig-component
+   (type id)
+   (type id = core-type)
+   (val id : core-type)]
+
+  )

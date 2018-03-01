@@ -15,6 +15,7 @@
    (∀ (id ...) core-type)]
 
   [core-expr
+   id
    integer
    (core-expr core-expr ...)
    (λ ({id : core-type} ...) core-expr)
@@ -36,22 +37,22 @@
               ...)]
 
   [toplevel-binding
-   (define-signature id = sig-expr)
-   (define-module id = mod-expr)]
+   (define-signature id = signature-expr)
+   (define-module id = module-expr)]
 
-  [sig-expr
-   id
-   (sig sig-component ...)
-   (Π ({id : sig-expr}) sig-expr)
-   (let ([id mod-expr]) sig-expr)]
-
-  [mod-expr
+  [module-expr
    id
    (mod core-def ...)
-   (seal mod-expr :> sig-expr)
-   (mod-expr mod-expr)
-   (λ ({id : sig-expr}) mod-expr)
-   (let ([id mod-expr]) mod-expr)]
+   (seal module-expr :> signature-expr)
+   (module-expr module-expr)
+   (λ ({id : signature-expr}) module-expr)
+   (let ([id module-expr]) module-expr)]
+
+  [signature-expr
+   id
+   (sig sig-component ...)
+   (Π ({id : signature-expr}) signature-expr)
+   (let ([id module-expr]) signature-expr)]
 
   [sig-component
    (type id)

@@ -53,28 +53,28 @@ collection of type and value definitions. A @deftech{functor} is a
 conceptualized as a "function" from modules to modules.
 
 Operations on modules include applying a functor to a @tech{module} to
-produce another @tech{module}, and sealing the module with a
-@tech{signature}. Our module language will not support features such
+produce another @tech{module}, and sealing a module with a
+@tech{signature}. The module language will not support features such
 as nested modules or recursive functors.
 
-A @deftech{signature} as a type for a @tech{module}.
-
-We want to build this prototype as a proof of concept. We plan to move
-on to adding modules and functors to Hackett if this is successful.
+There is a corresponding @deftech{signature} form for each kind of
+@tech{module}. A @deftech{sig} describes the bindings of a @tech{mod},
+and a @deftech{pi} describes the input and output of a @tech{functor}.
 
 @;{-------------------------------------------------------------------}
 @bold{Milestones}
+
+We want to build this prototype as a proof of concept. We plan to move
+on to adding modules and functors to Hackett if it is successful.
 
 @itemlist[
   @item{Develop the grammar capabilities of the module language;
         anticipate edge cases by building significant examples.}
   @item{Build the typed core language.}
   @item{Create the first iteration of the module system, featuring only
-        @tech{mod} and @tech{sig}
-
-  Create a module system with just @tech{mod}s and @tech{signature}s.}
-  @item{
-    Implement @tech{functor}s and functor signatures.}
-  @item{
-    Explore integration of this system into the Hackett language.}
-]}
+        @tech{mod} and @tech{sig} forms.}
+  @item{Implement @tech{functor}s and @tech{pi}s. Ensure that module
+        resolution is consistent. At this point, we should be able to
+        use our examples to set up a demo.}
+  @item{Explore integration of this system into the Hackett language.}
+]

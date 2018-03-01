@@ -1,5 +1,5 @@
 #lang info
 
 (define scribblings
-  '(["scribblings/grammar.scrbl" () experimental "macrotypefunctors"]))
+  '(["scribblings/grammar.scrbl" () (experimental) "macrotypefunctors"]))
 

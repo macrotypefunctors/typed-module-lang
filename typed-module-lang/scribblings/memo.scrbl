@@ -50,12 +50,9 @@ A @deftech{module} can be either a @tech{mod} or a @tech{functor}.  A
 @deftech{mod} (sometimes referred to as a @emph{structure}) is a
 collection of type and value definitions. A @deftech{functor} is a
 @tech{module} that is parameterized over another module, and can be
-conceptualized as a "function" from modules to modules.
-
-Operations on modules include applying a functor to a @tech{module} to
-produce another @tech{module}, and sealing a module with a
-@tech{signature}. The module language will not support features such
-as nested modules or recursive functors.
+conceptualized as a "function" from modules to modules. Operations on
+modules include applying a functor to a @tech{module} to produce
+another @tech{module}, and sealing a module with a @tech{signature}. 
 
 There is a corresponding @deftech{signature} form for each kind of
 @tech{module}. A @deftech{sig} describes the bindings of a @tech{mod},

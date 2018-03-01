@@ -1,7 +1,5 @@
 #lang scribble/manual
 
-@title{Grammar}
-
 @bold{Core Language}
 
 @(racketgrammar*

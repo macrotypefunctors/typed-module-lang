@@ -7,9 +7,11 @@
 
   [core-defn
    (type id = core-type)
+   (newtype id = (id core-type))
    (val id : core-type = core-expr)]
 
   [core-type
+   id
    Int
    (-> core-type ... core-type)
    (∀ (id ...) core-type)]

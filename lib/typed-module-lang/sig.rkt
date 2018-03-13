@@ -1,6 +1,5 @@
 #lang racket/base
-(require racket/match racket/bool racket/dict syntax/id-table
-         (only-in cond-strict [cond/strict cond]))
+(require racket/match racket/bool)
 
 ;; ---------------------------------------------------------
 
@@ -19,7 +18,7 @@
 ;;   (Hashof Symbol SigComponent)
 
 ;; A SigComponent is one of:
-;;  - (type-alias-decl [TypeWOpaque Symbol])
+;;  - (type-alias-decl Type)
 ;;  - (type-opaque-decl)
 ;;  - (val-decl Type)
 
@@ -37,93 +36,76 @@
 
 ;; ---------------------------------------------------------
 
-;; A [TypeWOpaque X] is one of:
+;; A Type is one of:
 ;;  - BaseType
-;;  - (-> [TypeWOpaque X] [TypeWOpaque X])
-;;  - (opaque-type-reference X)
+;;  - (-> Type Type)
+;;  - (named-referenced Symbol)
 ;;  - (dot ModExpr Symbol)
 ;;  - TODO: ∀
 
 (struct Int [] #:prefab)
-(struct opaque-type-reference [X] #:prefab)
+(struct named-referenced [type-name] #:prefab)
 (struct dot [mod type-name] #:prefab)
+
+;; NOTE: in implementations of ML the two above types are merged
+;;       into a single type representing module paths
 
 ;; ---------------------------------------------------------
 
-;; A MEnv is a [IdTable Signature]
-;; representing module-level variables
+;; An EnvBinding is one of
+;;  - SigComponent
+;;  - Signature
+;; An Env is a [Hash Symbol EnvBinding] representing the types (opaque
+;; or alias) and modules (their signatures) in scope.
+
+;; TODO: it may be a better idea to use an id-table instead of a hash
+;; with symbol keys. need to discuss pros / cons
 
 ;; MEnv MEnv Signature Signature -> Bool
-(define (signature-matches? m-env1 m-env2 A B)
+(define (signature-matches? env A B)
   (cond
-    [(and (hash? A) (hash? B))     (sig-matches? m-env1 m-env2 A B)]
-    [(and (pi-sig? A) (pi-sig? B)) (pi-sig-matches? m-env1 m-env2 A B)]))
+    [(and (hash? A)   (hash? B))   (sig-matches? env A B)]
+    [(and (pi-sig? A) (pi-sig? B)) (pi-sig-matches? env A B)]
+    [else #f]))
 
 ;; MEnv MEnv PiSig PiSig -> Bool
-(define (pi-sig-matches? m-env1 m-env2 A B)
+(define (pi-sig-matches? env A B)
   (match-define (pi-sig A-x A-in A-out) A)
   (match-define (pi-sig B-x B-in B-out) B)
-  (define B-out* (signature-subst B-out B-x A-x))
-  (and
-   (signature-matches? m-env1 m-env2
-                       B-in A-in)
-   ;; TODO: think about this `B-in` more, I think this corresponds to
-   ;; the A' on page 8 of `Subtyping Dependent Types` by Aspinall +
-   ;; Compagnoni 2000                       ||||
-   ;;                                       vvvv
-   (signature-matches? (dict-set m-env1 A-x B-in)
-                       (dict-set m-env2 A-x B-in)
-                       A-out B-out*)))
+  (define A-out* (signature-subst A-out A-x B-x))
+  (define env* (hash-set env (syntax-e B-x) B-in))
+  (and (signature-matches? env B-in A-in)
+       ;; we add B-in to the environment here because it is the most
+       ;; specific type that both signatures need to be compatible with
+       (signature-matches? env* A-out* B-out)))
 
-(define (signature-subst S x y)
-  (unless (free-identifier=? x y)
+(define (signature-subst S x-from x-to)
+  (unless (free-identifier=? x-from x-to)
     (error "TODO. identifiers not equal"))
   S)
 
 ;; ---------------------------------------------------------
 
-;; An OTyEnv is a [Hashof Symbol Type]
-;; representing a mapping from opaque type names to 
-;; definitions
+;; Env Sig Sig -> Bool
+(define (sig-matches? env A B)
+  (define env*
+    (for/fold ([env* env])
+              ([(A-x A-comp) (in-hash A)])
+      (hash-set env* A-x A-comp)))
 
-;; MEnv MEnv Sig Sig -> Bool
-(define (sig-matches? m-env1 m-env2 A B)
-  ;; process type declarations first
-  ;; get the mapping from B's opaque types to A's types
-  (define b->a
-    (for/fold ([b->a (hash)])
-              ([(sym B-comp) (in-hash B)]
-               #:when (type-opaque-decl? B-comp))
-      #:break (not b->a)
-      (let ([A-comp (hash-ref A sym #f)])
-        (match A-comp
-          [(type-alias-decl t)
-           (hash-set b->a sym t)]
-          [(type-opaque-decl)
-           (hash-set b->a sym (opaque-type-reference sym))]
-          [_
-           #false]))))
+  (for/and ([(B-x B-comp) (in-hash B)])
+    (define A-comp
+      (hash-ref A B-x #f))
+    (and A-comp
+         (sig-component-matches? env* A-comp B-comp))))
 
-  ;; create an identity mapping for A's opaque types
-  (define a->a
-    (for/hash ([(sym A-comp) (in-hash A)]
-               #:when (type-opaque-decl? A-comp))
-      (values sym (opaque-type-reference sym))))
-
-  (and b->a
-       (for/and ([(sym B-comp) (in-hash B)])
-         (let ([A-comp (hash-ref A sym #f)])
-           (and A-comp
-                (sig-component-matches? m-env1 m-env2 a->a b->a
-                                        A-comp B-comp))))))
-
-;; MEnv MEnv OTyEnv OTyEnv SigComp SigComp -> Boolean
-(define (sig-component-matches? m-env1 m-env2 A-env B-env A B)
+;; Env SigComp SigComp -> Bool
+(define (sig-component-matches? env A B)
   (match* [A B]
     [[(val-decl A) (val-decl B)]
-     (type-matches? m-env1 m-env2 A-env B-env A B)]
+     (type-matches? env A B)]
     [[(type-alias-decl A) (type-alias-decl B)]
-     (type-equal? m-env1 m-env2 A-env B-env A B)]
+     (type-equal? env A B)]
     [[(type-opaque-decl) (type-opaque-decl)]
      #true]
     [[(type-alias-decl _) (type-opaque-decl)]
@@ -131,80 +113,103 @@
     [[_ _]
      #false]))
 
-;; MEnv MEnv OTyEnv OTyEnv Type Type -> Boolean
-(define (type-equal? m-env1 m-env2 A-env B-env A B)
-  (and (type-matches? m-env1 m-env2 A-env B-env A B)
-       (type-matches? m-env2 m-env1 B-env A-env B A)))
+;; Env Type Type -> Bool
+(define (type-equal? env A B)
+  (and (type-matches? env A B)
+       (type-matches? env B A)))
 
-;; MEnv MEnv OTyEnv OTyEnv Type Type -> Boolean
-(define (type-matches? m-env1 m-env2 A-env B-env A B)
+;; Env Type Type -> Bool
+(define (type-matches? env A B)
   (match* [A B]
-    [[_ _] #:when (equal? A B) #t]
 
-    ;; TODO: function type
+    ;; two identical named-referenced types are equal; this handles the case of
+    ;; two opaque types as well as preemtively matching aliases that
+    ;; are obviously the same. if they are not identical then try to
+    ;; reduce them by looking up type aliases. if we determine that
+    ;; one is an opaque type, then we can fail because the only way
+    ;; two opaque types can be the same is if they are referred to by
+    ;; the same name. thus they should have been accepted by the
+    ;; initial check.
 
-    [[(opaque-type-reference x) _]
-     #:when A-env
-     (type-matches? m-env1 m-env2 #f B-env (hash-ref A-env x) B)]
+    [[(named-referenced x) (named-referenced x)] #t]
+    [[(named-referenced x) _]
+     (=> cont)
+     (match (lookup env x)
+       [(type-alias-decl A*) (type-matches? env A* B)]
+       [_ (cont)])]
+    [[_ (named-referenced y)]
+     (=> cont)
+     (match (lookup env y)
+       [(type-alias-decl B*) (type-matches? env A B*)]
+       [_ (cont)])]
 
-    [[_ (opaque-type-reference y)]
-     #:when B-env
-     (type-matches? m-env1 m-env2 A-env #f A (hash-ref B-env y))]
+    ;; similar for dotted expressions although "M.x <: N.x" requires
+    ;; check if "M = N". according to ATAPL this is undecidable in
+    ;; general, and there are very confusing circumstances that can
+    ;; arise when we try to seal M or N. thus it is easier when M and
+    ;; N are only allowed to be identifiers (or paths).
 
-    [[(opaque-type-reference x) (opaque-type-reference y)]
-     (symbol=? x y)]
+    [[(dot M x) (dot N x)]
+     #:when (mod-expr-equal? M N)
+     #t]
+    [[(dot M x) _]
+     (=> cont)
+     (match (lookup/mod-expr env M x)
+       [(type-alias-decl A*) (type-matches? env A* B)]
+       [_ (cont)])]
+    [[_ (dot N y)]
+     (=> cont)
+     (match (lookup/mod-expr env N y)
+       [(type-alias-decl B*) (type-matches? env A B*)]
+       [_ (cont)])]
 
-    [[(dot m x) _]
-     #:when m-env1
-     (type-matches? #f m-env2 A-env B-env
-                    (lookup-mod-type m-env1 m x)
-                    B)]
-    [[_ (dot m y)]
-     #:when m-env2
-     (type-matches? m-env1 #f A-env B-env
-                    A
-                    (lookup-mod-type m-env2 m y))]
+    ;; TODO: arrow types
 
-    [[_ _]
-     #false]))
+    [[_ _] (equal? A B)]))
+
+;; ModExpr ModExpr -> Bool
+(define (mod-expr-equal? M N)
+  ;; TODO: handle cases other than ModExpr is an Id
+  (free-identifier=? M N))
 
 ;; -----------------------------------------------------
 
-;; lookup-mod-type : MEnv ModExpr Sym -> Type
-(define (lookup-mod-type m-env m x)
-  (unless (identifier? m)
-    (error "TODO: m is not an id"))
-  (unless (dict-has-key? m-env m)
-    (error "m is not defined"))
-  (define m-sig (dict-ref m-env m))
-  (unless (hash? m-sig)
-    (error "m is not a `mod`"))
-  (unless (hash-has-key? m-sig x)
-    (error "sig does not have x"))
-  (match (hash-ref m-sig x)
-    [(type-opaque-decl)
-     ;; TODO: make sure this isn't an infinite loop
-     (dot m x)]
-    [(type-alias-decl t)
-     (qualify-opaque-references t m)]
-    [_
-     (error "not a type declaration")]))
+;; Env Symbol -> EnvBinding or #f
+(define (lookup env x)
+  (hash-ref env x #f))
 
-;; qualify-opaque-references : Type ModExpr -> Type
-(define (qualify-opaque-references t m)
-  (match t
-    [(opaque-type-reference sym)
-     (dot m sym)]
-    [(Int) t]))
+;; Env ModExpr Symbol -> EnvBinding or #f
+(define (lookup/mod-expr env M x)
+  ;; TODO: handle cases other than ModExpr is an Id
+  (match (lookup env (syntax-e M))
+    [(? hash? sig)
+     (define comp (hash-ref sig x #f))
+     (and comp (qualify-component M comp))]
+    [_ #f]))
+
+;; ModExpr Component -> Component
+;; prefix all named types in the component with module 'M'
+(define (qualify-component M comp)
+  (match comp
+    [(val-decl ty)        (val-decl (qualify-type M ty))]
+    [(type-alias-decl ty) (type-alias-decl (qualify-type M ty))]
+    [(type-opaque-decl)   (type-opaque-decl)]))
+
+;; ModExpr Type -> Component
+(define (qualify-type M type)
+  (match type
+    [(named-referenced x) (dot M x)]
+    [(dot M x) (error 'qualify-type "TODO: qualifying a dot type?")]
+    [_ type]))
 
 ;; -----------------------------------------------------
 
 (module+ test
   (require rackunit racket/function)
   (define-binary-check (check-sig-matches A B)
-    (signature-matches? (hash) (hash) A B))
+    (signature-matches? (hash) A B))
   (define-binary-check (check-not-sig-matches A B)
-    (not (signature-matches? (hash) (hash) A B)))
+    (not (signature-matches? (hash) A B)))
 
   (define sig hash)
 
@@ -227,14 +232,14 @@
   (define sig-X/Y-x:X
     (sig
      'X (type-opaque-decl)
-     'Y (type-alias-decl (opaque-type-reference 'X))
-     'x (val-decl (opaque-type-reference 'X))))
+     'Y (type-alias-decl (named-referenced 'X))
+     'x (val-decl (named-referenced 'X))))
 
   (define sig-X/Y-x:Y
     (sig
      'X (type-opaque-decl)
      'Y (type-opaque-decl)
-     'x (val-decl (opaque-type-reference 'Y))))
+     'x (val-decl (named-referenced 'Y))))
 
   (check-sig-matches sig-X/Y-x:X sig-X/Y-x:Y)
   (check-not-sig-matches sig-X/Y-x:Y sig-X/Y-x:X)
@@ -243,12 +248,12 @@
   (define sig-X-Y=X
     (sig
      'X (type-opaque-decl)
-     'Y (type-alias-decl (opaque-type-reference 'X))))
+     'Y (type-alias-decl (named-referenced 'X))))
 
   (define sig-Y-X=Y
     (sig
      'Y (type-opaque-decl)
-     'X (type-alias-decl (opaque-type-reference 'Y))))
+     'X (type-alias-decl (named-referenced 'Y))))
 
   (check-not-sig-matches sig-X-Y=X sig-Y-X=Y)
 
@@ -257,20 +262,20 @@
    (sig 'v (val-decl (Int))
         'X (type-alias-decl (Int))
         'Y (type-alias-decl (Int)))
-   (sig 'v (val-decl (opaque-type-reference 'X))
+   (sig 'v (val-decl (named-referenced 'X))
         'X (type-opaque-decl)
-        'Y (type-alias-decl (opaque-type-reference 'X))))
+        'Y (type-alias-decl (named-referenced 'X))))
 
   (check-sig-matches
    (sig 'X (type-opaque-decl)
-        'Y (type-alias-decl (opaque-type-reference 'X)))
+        'Y (type-alias-decl (named-referenced 'X)))
    (sig 'Y (type-opaque-decl)))
 
   (let ([x #'x]
         [I  (sig 't (type-opaque-decl))]
         [I* (sig 't (type-alias-decl (Int)))]
         [J  (sig 's (type-opaque-decl) 't (type-opaque-decl))]
-        [J* (sig 's (type-opaque-decl) 't (type-alias-decl (opaque-type-reference 's)))])
+        [J* (sig 's (type-opaque-decl) 't (type-alias-decl (named-referenced 's)))])
     (check-sig-matches I* I)
     (check-sig-matches J* J)
 

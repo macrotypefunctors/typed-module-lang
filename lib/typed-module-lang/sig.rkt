@@ -61,23 +61,23 @@
 ;; TODO: it may be a better idea to use an id-table instead of a hash
 ;; with symbol keys. need to discuss pros / cons
 
-;; MEnv MEnv Signature Signature -> Bool
+;; Env Signature Signature -> Bool
 (define (signature-matches? env A B)
   (cond
     [(and (hash? A)   (hash? B))   (sig-matches? env A B)]
     [(and (pi-sig? A) (pi-sig? B)) (pi-sig-matches? env A B)]
     [else #f]))
 
-;; MEnv MEnv PiSig PiSig -> Bool
+;; Env PiSig PiSig -> Bool
 (define (pi-sig-matches? env A B)
   (match-define (pi-sig A-x A-in A-out) A)
   (match-define (pi-sig B-x B-in B-out) B)
   (define A-out* (signature-subst A-out A-x B-x))
-  (define env* (hash-set env (syntax-e B-x) B-in))
+  (define env/out (hash-set env (syntax-e B-x) B-in))
   (and (signature-matches? env B-in A-in)
        ;; we add B-in to the environment here because it is the most
        ;; specific type that both signatures need to be compatible with
-       (signature-matches? env* A-out* B-out)))
+       (signature-matches? env/out A-out* B-out)))
 
 (define (signature-subst S x-from x-to)
   (unless (free-identifier=? x-from x-to)

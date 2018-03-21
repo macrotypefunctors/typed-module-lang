@@ -1,0 +1,19 @@
+
+Fully typechecking a mod form goes in 4 passes:
+
+1: which types exist? are they aliases or newtypes?
+   Don't expand them.
+   Corresponds to the ec relation: ⊢≫type-decl
+
+2: expand the types to find what they are equal to,
+   check to rule out recursion and mutual recursion between type aliases
+   Corresponds to the ec relation: ⊢≫type-def
+
+3: which vals exist? what are their types?
+   Don't expand them, don't check subtypes, etc.
+   Corresponds to the ec relation: ⊢≫val-decl
+
+4. expand the vals and type check them, including checking subtypes
+   Corresponds to the ec relations: ⊢≫⇒
+                                    ⊢≫⇐
+

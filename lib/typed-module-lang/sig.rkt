@@ -14,6 +14,8 @@
 
 ;; ---------------------------------------------------------
 
+(provide val-decl)
+
 ;; A Sig is represented with a
 ;;   (Hashof Symbol SigComponent)
 

@@ -106,13 +106,12 @@
   [⊢≫type-def⇒ [_ ⊢ stx] (er ⊢≫type-def⇒ ≫ stx type-def⇒ '())]
   ;; pass 3
   [⊢≫val-decl⇒
-   ; this G will include *only* previous definitions
-   ; DO NOT typecheck e in this context
-   [G ⊢ #'(_ x:id : τ-stx:expr = e:expr)]
+   [type-env ⊢ #'(_ x:id : τ-stx:expr = e:expr)]
+   ;; TODO: use the type-env somehow when processing τ-stx or τ
    (define τ (expand-type #'τ-stx))
    (er ⊢≫val-decl⇒
        ≫ #`(val/pass-4 x : #,(type-stx τ) = e)
-       val-decl⇒ (cons (list #'x τ) G))])
+       val-decl⇒ (list (list #'x τ)))])
 
 (define-typed-syntax val/pass-4
   #:datum-literals [: =]

@@ -96,8 +96,6 @@
 ;;  - type
 ;;  - newtype
 
-(define-syntax m (λ (stx) stx))
-
 (define-typed-syntax val
   #:datum-literals [: =]
   ;; pass 1
@@ -119,11 +117,31 @@
   [⊢≫val-def⇐
    ; this G will include all top-level definitions in the program
    ; e can only be typechecked in *this* G
-   [G ⊢ #'(_ x : τ-stx = e) val-def⇐]
+   [G ⊢ #'(_ x : τ-stx = e)]
    (define τ (expand-type #'τ-stx))
    (ec G ⊢ #'e ≫ #'e- ⇐ τ)
    (er ⊢≫val-def⇐
        ≫ #`(define x e-))])
+
+(define-typed-syntax type
+  #:datum-literals [: =]
+  ;; pass 1
+  [⊢≫type-decl⇒
+   [⊢ #'(_ name:id . stuff)]
+   (er ⊢≫type-decl⇒ ≫ #'(type name . stuff)
+       type-decl⇒ (list (list #'name 'type-alias)))]
+  ;; pass 2
+  [⊢≫type-def⇒
+   [decl-kind-env ⊢ #'(_ name:id = τ-stx)]
+   ;; TODO: use the decl-kind-env somehow when processing τ-stx or τ
+   (define τ (expand-type #'τ-stx))
+   (er ⊢≫type-def⇒ ≫ #'(type/pass-3-4) type-def⇒ (list (list #'name τ)))])
+
+(define-typed-syntax type/pass-3-4
+  ;; pass 3
+  [⊢≫val-decl⇒ [_ ⊢ stx] (er ⊢≫val-decl⇒ ≫ stx val-decl⇒ '())]
+  ;; pass 4
+  [⊢≫val-def⇐ [_ ⊢ stx] (er ⊢≫val-def⇐ ≫ #'(begin))])
 
 ;; ----------------------------------------------------
 

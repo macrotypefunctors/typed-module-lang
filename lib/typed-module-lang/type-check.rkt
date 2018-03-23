@@ -56,10 +56,10 @@
   #:bad-output (raise-syntax-error #f "expected a type or val declaration" decl))
 
 (define-expand-check-relation tc/val-def
-  ;; type-env : TypeEnv
-  [type-env defn -> defn-]
-  [type-env ⊢ defn ≫ defn- val-def⇐]
-  [type-env ⊢ defn val-def⇐]
+  ;; G : ValEnv
+  [G defn -> defn-]
+  [G ⊢ defn ≫ defn- val-def⇐]
+  [G ⊢ defn]
   [≫ defn-]
   #:in-stx defn
   #:out-stx defn-

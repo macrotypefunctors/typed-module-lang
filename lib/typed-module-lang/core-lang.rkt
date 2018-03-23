@@ -79,7 +79,7 @@
     ;; pass 4
     (define ds/4
       (for/list ([d (in-list ds/3)])
-        (ec val-env ⊢ d ≫ d- val-def⇐)
+        (ec type-env val-env ⊢ d ≫ d- val-def⇐)
         d-))
     (values ds/4 type-env val-env)))
 
@@ -118,7 +118,7 @@
   [⊢≫val-def⇐
    ; this G will include all top-level definitions in the program
    ; e can only be typechecked in *this* G
-   [G ⊢ #'(_ x : τ-stx = e)]
+   [τG G ⊢ #'(_ x : τ-stx = e)]
    (define τ (expand-type #'τ-stx))
    (ec G ⊢ #'e ≫ #'e- ⇐ τ)
    (er ⊢≫val-def⇐
@@ -142,7 +142,7 @@
   ;; pass 3
   [⊢≫val-decl⇒ [_ ⊢ stx] (er ⊢≫val-decl⇒ ≫ stx val-decl⇒ '())]
   ;; pass 4
-  [⊢≫val-def⇐ [_ ⊢ stx] (er ⊢≫val-def⇐ ≫ #'(begin))])
+  [⊢≫val-def⇐ [_ _ ⊢ stx] (er ⊢≫val-def⇐ ≫ #'(begin))])
 
 ;; ----------------------------------------------------
 

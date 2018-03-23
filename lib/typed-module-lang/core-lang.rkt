@@ -3,6 +3,7 @@
 (provide Int
          ->
          val
+         type
          (rename-out [core-lang-module-begin #%module-begin])
          #%datum
          #%var

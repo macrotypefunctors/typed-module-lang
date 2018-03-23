@@ -46,7 +46,7 @@
 (define-expand-check-relation tc/val-decl
   ;; type-env : TypeEnv
   ;; intro-vals : ValEnv
-  [type-env decl -> decl-]
+  [type-env decl -> decl- intro-vals]
   [type-env ⊢ decl ≫ decl- val-decl⇒ intro-vals]
   [type-env ⊢ decl]
   [≫ decl- val-decl⇒ intro-vals]
@@ -54,6 +54,17 @@
   #:out-stx decl-
   #:stop-ids '()
   #:bad-output (raise-syntax-error #f "expected a type or val declaration" decl))
+
+(define-expand-check-relation tc/val-def
+  ;; type-env : TypeEnv
+  [type-env defn -> defn-]
+  [type-env ⊢ defn ≫ defn- val-def⇐]
+  [type-env ⊢ defn val-def⇐]
+  [≫ defn-]
+  #:in-stx defn
+  #:out-stx defn-
+  #:stop-ids '()
+  #:bad-output (raise-syntax-error #f "expected a type or val declaration" defn))
 
 ;; -------------------------------------------------------------------
 ;; signature checking

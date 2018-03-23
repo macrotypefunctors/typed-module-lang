@@ -50,17 +50,12 @@
    ;; the module-sig should definitely *not*
    ;; include bindings from the external-G
    #:with name (generate-temporary 'mod)
-   (define-values [module-G revds]
-     (for/fold ([G '()]
-                [revds '()])
-               ([d (in-list (attribute d))])
-       (ec G ⊢ d ≫ d- def⇒ G*)
-       (values G* (cons d- revds))))
-   (define module-sig (module-env->sig module-G))
+   (define-values [ds- type-env val-env]
+     (core-lang-tc-passes (attribute d)))
+   ;; TODO: include the type-env too
+   (define module-sig (module-env->sig val-env))
    (er ⊢≫sig⇒
-       ≫ #`(begin
-             #,@(for/list ([d (in-list (reverse revds))])
-                  (tc-in module-G d)))
+       ≫ #`(begin #,@ds-)
        sig⇒ module-sig)])
 
 ;; --------------------------------------------------------------

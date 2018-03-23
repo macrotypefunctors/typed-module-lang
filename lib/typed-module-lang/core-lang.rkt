@@ -6,7 +6,7 @@
          (rename-out [core-lang-module-begin #%module-begin])
          #%datum
          #%var
-         )
+         (for-syntax core-lang-tc-passes))
 
 (require syntax/parse/define
          macrotypes-nonstx/type-macros
@@ -15,6 +15,25 @@
                      racket/syntax
                      macrotypes-nonstx/type-prop
                      "type-check.rkt"))
+
+(begin-for-syntax
+  ;; the body should return 2 values:
+  ;;  - the next value for the acc-id
+  ;;  - the element of the result list
+  ;; the whole form returns 2 values:
+  ;;  - the final value for the acc-id
+  ;;  - the whole result list
+  ;; for/list/acc does not handle #:break in the body
+  (define-syntax-rule (for/list/acc ([acc-id acc-init])
+                                    (clause ...)
+                        body ...)
+    (for/fold ([acc-id acc-init]
+               [rev-list-id '()]
+               #:result (values acc-id (reverse rev-list-id)))
+              (clause ...)
+      (let-values ([(acc-new elem-new)
+                    (let () body ...)])
+        (values acc-new (cons elem-new rev-list-id))))))
 
 ;; ----------------------------------------------------
 
@@ -31,18 +50,44 @@
 
 ;; A "whole program" for core-lang follows this rule
 
+(begin-for-syntax
+  ;; core-lang-tc-passes :
+  ;; [Listof Stx] -> (values [Listof Stx] TypeEnv ValEnv)
+  (define (core-lang-tc-passes ds)
+    ;; pass 1
+    (define-values [decl-kind-env ds/1]
+      (for/list/acc ([dke '()])
+                    ([d (in-list ds)])
+        (ec ⊢ d ≫ d- type-decl⇒ d-decls)
+        (values (append d-decls dke)
+                d-)))
+    ;; pass 2
+    (define-values [type-env ds/2]
+      (for/list/acc ([te '()])
+                    ([d (in-list ds/1)])
+        (ec decl-kind-env ⊢ d ≫ d- type-def⇒ d-types)
+        (values (append d-types te)
+                d-)))
+    ;; pass 3
+    (define-values [val-env ds/3]
+      (for/list/acc ([G '()])
+                    ([d (in-list ds/2)])
+        (ec G ⊢ d ≫ d- val-decl⇒ d-vals)
+        (values (append d-vals G)
+                d-)))
+    ;; pass 4
+    (define ds/4
+      (for/list ([d (in-list ds/3)])
+        (ec val-env ⊢ d ≫ d- val-def⇐)
+        d-))
+    (values ds/4 type-env val-env)))
+
 (define-syntax core-lang-module-begin
   (syntax-parser
     [(_ d:expr ...)
-     (define-values [module-G revds]
-       (for/fold ([G '()]
-                  [revds '()])
-                 ([d (in-list (attribute d))])
-         (ec G ⊢ d ≫ d- def⇒ G*)
-         (values G* (cons d- revds))))
-     #`(#%module-begin
-        #,@(for/list ([d (in-list (reverse revds))])
-             (tc-in module-G d)))]))
+     (define-values [ds- te ve]
+       (core-lang-tc-passes (attribute d)))
+     #`(#%module-begin #,@ds-)]))
 
 ;; ----------------------------------------------------
 
@@ -51,26 +96,35 @@
 ;;  - type
 ;;  - newtype
 
+(define-syntax m (λ (stx) stx))
+
 (define-typed-syntax val
   #:datum-literals [: =]
-  [⊢≫def⇒
+  ;; pass 1
+  [⊢≫type-decl⇒ [⊢ stx] (er ⊢≫type-decl⇒ ≫ stx type-decl⇒ '())]
+  ;; pass 2
+  [⊢≫type-def⇒ [_ ⊢ stx] (er ⊢≫type-def⇒ ≫ stx type-def⇒ '())]
+  ;; pass 3
+  [⊢≫val-decl⇒
    ; this G will include *only* previous definitions
    ; DO NOT typecheck e in this context
    [G ⊢ #'(_ x:id : τ-stx:expr = e:expr)]
    (define τ (expand-type #'τ-stx))
-   (er ⊢≫def⇒ ≫ #`(val/pass-2 x : #,(type-stx τ) e)
-       def⇒ (cons (list #'x τ) G))])
+   (er ⊢≫val-decl⇒
+       ≫ #`(val/pass-4 x : #,(type-stx τ) = e)
+       val-decl⇒ (cons (list #'x τ) G))])
 
-(define-syntax-parser val/pass-2
-  #:datum-literals [:]
-  [(_ x : τ-stx e)
-   (match this-syntax
-     [(tc-in G _)
-      ; this G will include all top-level definitions in the program
-      ; e can only be typechecked in *this* G
-      (define τ (expand-type #'τ-stx))
-      (ec G ⊢ #'e ≫ #'e- ⇐ τ)
-      #`(define x e-)])])
+(define-typed-syntax val/pass-4
+  #:datum-literals [: =]
+  ;; pass 4
+  [⊢≫val-def⇐
+   ; this G will include all top-level definitions in the program
+   ; e can only be typechecked in *this* G
+   [G ⊢ #'(_ x : τ-stx = e) val-def⇐]
+   (define τ (expand-type #'τ-stx))
+   (ec G ⊢ #'e ≫ #'e- ⇐ τ)
+   (er ⊢≫val-def⇐
+       ≫ #`(define x e-))])
 
 ;; ----------------------------------------------------
 

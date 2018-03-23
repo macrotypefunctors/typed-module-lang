@@ -22,9 +22,9 @@
 (define-expand-check-relation tc/type-decl
   ;; intro-decls : DeclKindEnv
   [decl -> decl- intro-decls]
-  [⊢ decl ≫ decl- type-decl intro-decls]
+  [⊢ decl ≫ decl- type-decl⇒ intro-decls]
   [⊢ decl]
-  [≫ decl- type-decl intro-decls]
+  [≫ decl- type-decl⇒ intro-decls]
   #:in-stx decl
   #:out-stx decl-
   #:stop-ids '()
@@ -35,9 +35,9 @@
 (define-expand-check-relation tc/type-def
   ;; intro-types : TypeEnv
   [decl-kinds defn -> defn- intro-types]
-  [decl-kinds ⊢ defn ≫ defn- type-def intro-types]
+  [decl-kinds ⊢ defn ≫ defn- type-def⇒ intro-types]
   [decl-kinds ⊢ defn]
-  [≫ defn- type-def intro-types]
+  [≫ defn- type-def⇒ intro-types]
   #:in-stx defn
   #:out-stx defn-
   #:stop-ids '()
@@ -47,9 +47,9 @@
   ;; type-env : TypeEnv
   ;; intro-vals : ValEnv
   [type-env decl -> decl-]
-  [type-env ⊢ decl ≫ decl- val-decl intro-vals]
+  [type-env ⊢ decl ≫ decl- val-decl⇒ intro-vals]
   [type-env ⊢ decl]
-  [≫ decl- val-decl intro-vals]
+  [≫ decl- val-decl⇒ intro-vals]
   #:in-stx decl
   #:out-stx decl-
   #:stop-ids '()

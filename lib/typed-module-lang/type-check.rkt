@@ -4,7 +4,10 @@
          (all-defined-out)
          cases)
 
-(require macrotypes-nonstx/expand-check-sugar
+(require racket/list
+         racket/match
+         macrotypes-nonstx/expand-check-sugar
+         macrotypes-nonstx/type-prop
          macrotypes-nonstx/type-check)
 
 ;; -------------------------------------------------------------------
@@ -40,7 +43,7 @@
   [≫ defn- type-def⇒ intro-types]
   #:in-stx defn
   #:out-stx defn-
-  #:stop-ids '()
+  #:stop-ids (map first decl-kinds)
   #:bad-output (raise-syntax-error #f "expected a type or val declaration" defn))
 
 (define-expand-check-relation tc/val-decl
@@ -52,7 +55,7 @@
   [≫ decl- val-decl⇒ intro-vals]
   #:in-stx decl
   #:out-stx decl-
-  #:stop-ids '()
+  #:stop-ids (map first type-env)
   #:bad-output (raise-syntax-error #f "expected a type or val declaration" decl))
 
 (define-expand-check-relation tc/val-def
@@ -64,8 +67,16 @@
   [≫ defn-]
   #:in-stx defn
   #:out-stx defn-
-  #:stop-ids '()
+  #:stop-ids (append (map first τG) (map first G))
   #:bad-output (raise-syntax-error #f "expected a type or val declaration" defn))
+
+;; -------------------------------------------------------------------
+;; expanding types
+
+;; expand-type/type-def : DeclKindEnv Stx -> Type
+(define (expand-type/type-def dke τ-stx)
+  (match-define (type-stx τ) (expand/tc/type-def-in dke τ-stx))
+  τ)
 
 ;; -------------------------------------------------------------------
 ;; signature checking

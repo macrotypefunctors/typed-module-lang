@@ -38,6 +38,11 @@
 
 ;; ---------------------------------------------------------
 
+;; TODO: think about named-referenced more, symbol vs. identifier,
+;;       and also whether it's the right thing to use in the
+;;       type-def-var rule
+(provide named-referenced)
+
 ;; A Type is one of:
 ;;  - BaseType
 ;;  - (-> Type Type)

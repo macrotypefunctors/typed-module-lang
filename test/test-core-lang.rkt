@@ -1,6 +1,7 @@
 #lang s-exp typed-module-lang/core-lang
 
-(type Op2 = (-> Int Int Int))
+(type Op2 = (-> Nit Int Nit))
+(type Nit = Int)
 
 (val x : Int = 5)
 

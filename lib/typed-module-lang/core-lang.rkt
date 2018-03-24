@@ -15,7 +15,9 @@
                      racket/match
                      racket/syntax
                      macrotypes-nonstx/type-prop
-                     "type-check.rkt"))
+                     "type-check.rkt"
+                     (only-in "sig.rkt" named-referenced)
+                     ))
 
 (begin-for-syntax
   ;; the body should return 2 values:
@@ -41,8 +43,10 @@
 (define-base-type Int)
 (define-type-constructor Arrow [inputs output])
 
-(define-syntax-parser ->
-  [(-> in* ... out*)
+(define-typed-syntax ->
+  [⊢≫type-def⇒
+   [dke ⊢ #'(-> in* ... out*)]
+   (define (expand-type t) (expand-type/type-def dke t))
    (define ins (map expand-type (attribute in*)))
    (define out (expand-type #'out*))
    (type-stx (Arrow ins out))])
@@ -69,6 +73,7 @@
         (ec decl-kind-env ⊢ d ≫ d- type-def⇒ d-types)
         (values (append d-types te)
                 d-)))
+    ;; TODO: check types for recursion / mutual-recursion somewhere
     ;; pass 3
     (define-values [val-env ds/3]
       (for/list/acc ([G '()])
@@ -106,8 +111,9 @@
   ;; pass 3
   [⊢≫val-decl⇒
    [type-env ⊢ #'(_ x:id : τ-stx:expr = e:expr)]
-   ;; TODO: use the type-env somehow when processing τ-stx or τ
-   (define τ (expand-type #'τ-stx))
+   ;; use the type-env when processing τ-stx
+   (define dke (map (λ (p) (list (car p) 'type-alias)) type-env))
+   (define τ (expand-type/type-def dke #'τ-stx))
    (er ⊢≫val-decl⇒
        ≫ #`(val/pass-4 x : #,(type-stx τ) = e)
        val-decl⇒ (list (list #'x τ)))])
@@ -119,7 +125,8 @@
    ; this G will include all top-level definitions in the program
    ; e can only be typechecked in *this* G
    [τG G ⊢ #'(_ x : τ-stx = e)]
-   (define τ (expand-type #'τ-stx))
+   (define dke (map (λ (p) (list (car p) 'type-alias)) τG))
+   (define τ (expand-type/type-def dke #'τ-stx))
    (ec G ⊢ #'e ≫ #'e- ⇐ τ)
    (er ⊢≫val-def⇐
        ≫ #`(define x e-))])
@@ -134,8 +141,9 @@
   ;; pass 2
   [⊢≫type-def⇒
    [decl-kind-env ⊢ #'(_ name:id = τ-stx)]
-   ;; TODO: use the decl-kind-env somehow when processing τ-stx or τ
-   (define τ (expand-type #'τ-stx))
+   ;; use the decl-kind-env when expanding τ-stx
+   (define τ (expand-type/type-def decl-kind-env #'τ-stx))
+   ;; TODO: check for recursion / mutual-recursion somewhere
    (er ⊢≫type-def⇒ ≫ #'(type/pass-3-4) type-def⇒ (list (list #'name τ)))])
 
 (define-typed-syntax type/pass-3-4
@@ -162,10 +170,19 @@
    (er ⊢≫⇒ ≫ #''i ⇒ (Int))])
 
 (define-typed-syntax #%var
+  ;; as an expression
   [⊢≫⇒
    [G ⊢ #'(_ x:id)]
    (match-define (list _ τ) (assoc #'x G free-identifier=?))
-   (er ⊢≫⇒ ≫ #'x ⇒ τ)])
+   (er ⊢≫⇒ ≫ #'x ⇒ τ)]
+  ;; within a type-def
+  [⊢≫type-def⇒
+   [dke ⊢ #'(_ x:id)]
+   ;; don't return er, return type-stx with a *type struct* instead
+   ;; TODO: think more about whether this `named-referenced` thing
+   ;;       should use an identifier or a symbol, or whether it should
+   ;;       use something else entirely
+   (type-stx (named-referenced (syntax-e #'x)))])
 
 ;; ----------------------------------------------------
 

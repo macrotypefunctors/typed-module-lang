@@ -4,5 +4,5 @@
 (type Nit = Int)
 
 (val x : Int = 5)
-
-(val y : Int = x)
+;(val x : Nit = 5)
+(val y : Int = Nit)

@@ -15,7 +15,9 @@
                      racket/match
                      racket/syntax
                      macrotypes-nonstx/type-prop
+                     macrotypes-nonstx/id-transformer
                      "type-check.rkt"
+                     "type.rkt"
                      ))
 
 (begin-for-syntax
@@ -39,41 +41,12 @@
 
 ;; ----------------------------------------------------
 
-;; a Type is one of
-;;   - BaseType
-;;   - (-> [Listof Type] Type)
-;;   - (named-reference Id)
-
-(define-base-type Int)
-(define-type-constructor Arrow [inputs output])
-
-(begin-for-syntax
-  (struct named-reference [id])
-
-  ;; Env Type Type -> Boolean
-  (define/match (subtype? G τ1 τ2)
-    [[_ (Arrow τ1-ins τ1-out) (Arrow τ2-ins τ2-out)]
-     (define (<: a b) (subtype? G a b))
-     (and (andmap <: τ2-ins τ1-ins)
-          (<: τ1-out τ2-out))]
-
-    [[_ (named-reference x) (named-reference y)]
-     (or (free-identifier=? x y)
-         (match* [(env-lookup-type-decl x)
-                  (env-lookup-type-decl y)]
-           [[(type-alias-decl τ1*) _] (subtype? G τ1* τ2)]
-           [[_ (type-alias-decl τ2*)] (subtype? G τ1 τ2*)]
-           [[_ _] #f]))]
-
-    [[_ _ _] (equal? τ1 τ2)])
-
-  ;; Env Type Type -> Boolean
-  (define (type≈? τ1 τ2)
-    (and (subtype? τ1 τ2)
-         (subtype? τ2 τ1)))
-
-  ;; TODO: change implicit ⇐ rule to use subtype?
-  )
+(define-syntax Int
+  (id-transformer
+   (cases
+    [⊢≫type⇐
+     [dke ⊢ _]
+     (type-stx (Int))])))
 
 (define-typed-syntax ->
   [⊢≫type⇐

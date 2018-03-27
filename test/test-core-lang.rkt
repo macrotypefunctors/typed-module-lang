@@ -5,4 +5,4 @@
 
 (val x : Int = 5)
 ;(val x : Nit = 5)
-(val y : Int = Nit)
+(val y : Int = x)

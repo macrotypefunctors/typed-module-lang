@@ -1,5 +1,7 @@
 #lang racket/base
-(require racket/match racket/bool)
+(require racket/match
+         racket/bool
+         "type.rkt")
 
 ;; ---------------------------------------------------------
 
@@ -38,24 +40,14 @@
 
 ;; ---------------------------------------------------------
 
-;; TODO: think about named-referenced more, symbol vs. identifier,
-;;       and also whether it's the right thing to use in the
-;;       type-def-var rule
-(provide named-referenced)
-
 ;; A Type is one of:
 ;;  - BaseType
-;;  - (-> Type Type)
-;;  - (named-referenced Symbol)
+;;  - (Arrow [Listof Type] Type)
+;;  - (named-reference Symbol)
 ;;  - (dot ModExpr Symbol)
 ;;  - TODO: ∀
 
-(struct Int [] #:prefab)
-(struct named-referenced [type-name] #:prefab)
 (struct dot [mod type-name] #:prefab)
-
-;; NOTE: in implementations of ML the two above types are merged
-;;       into a single type representing module paths
 
 ;; ---------------------------------------------------------
 
@@ -64,6 +56,12 @@
 ;;  - Signature
 ;; An Env is a [Hash Symbol EnvBinding] representing the types (opaque
 ;; or alias) and modules (their signatures) in scope.
+;; TODO: think about symbols vs. identifiers more!
+
+(define (sig-env->type-env env)
+  (for/list ([(x comp) (in-hash env)])
+    ('TODO)))
+
 
 ;; TODO: it may be a better idea to use an id-table instead of a hash
 ;; with symbol keys. need to discuss pros / cons
@@ -129,7 +127,7 @@
 (define (type-matches? env A B)
   (match* [A B]
 
-    ;; two identical named-referenced types are equal; this handles the case of
+    ;; two identical named-reference types are equal; this handles the case of
     ;; two opaque types as well as preemtively matching aliases that
     ;; are obviously the same. if they are not identical then try to
     ;; reduce them by looking up type aliases. if we determine that
@@ -138,13 +136,13 @@
     ;; the same name. thus they should have been accepted by the
     ;; initial check.
 
-    [[(named-referenced x) (named-referenced x)] #t]
-    [[(named-referenced x) _]
+    [[(named-reference x) (named-referenced x)] #t]
+    [[(named-reference x) _]
      (=> cont)
      (match (lookup env x)
        [(type-alias-decl A*) (type-matches? env A* B)]
        [_ (cont)])]
-    [[_ (named-referenced y)]
+    [[_ (named-reference y)]
      (=> cont)
      (match (lookup env y)
        [(type-alias-decl B*) (type-matches? env A B*)]
@@ -205,7 +203,7 @@
 ;; ModExpr Type -> Component
 (define (qualify-type M type)
   (match type
-    [(named-referenced x) (dot M x)]
+    [(named-reference x) (dot M x)]
     [(dot M x) (error 'qualify-type "TODO: qualifying a dot type?")]
     [_ type]))
 
@@ -239,14 +237,14 @@
   (define sig-X/Y-x:X
     (sig
      'X (type-opaque-decl)
-     'Y (type-alias-decl (named-referenced 'X))
-     'x (val-decl (named-referenced 'X))))
+     'Y (type-alias-decl (named-reference 'X))
+     'x (val-decl (named-reference 'X))))
 
   (define sig-X/Y-x:Y
     (sig
      'X (type-opaque-decl)
      'Y (type-opaque-decl)
-     'x (val-decl (named-referenced 'Y))))
+     'x (val-decl (named-reference 'Y))))
 
   (check-sig-matches sig-X/Y-x:X sig-X/Y-x:Y)
   (check-not-sig-matches sig-X/Y-x:Y sig-X/Y-x:X)
@@ -255,12 +253,12 @@
   (define sig-X-Y=X
     (sig
      'X (type-opaque-decl)
-     'Y (type-alias-decl (named-referenced 'X))))
+     'Y (type-alias-decl (named-reference 'X))))
 
   (define sig-Y-X=Y
     (sig
      'Y (type-opaque-decl)
-     'X (type-alias-decl (named-referenced 'Y))))
+     'X (type-alias-decl (named-reference 'Y))))
 
   (check-not-sig-matches sig-X-Y=X sig-Y-X=Y)
 
@@ -269,20 +267,20 @@
    (sig 'v (val-decl (Int))
         'X (type-alias-decl (Int))
         'Y (type-alias-decl (Int)))
-   (sig 'v (val-decl (named-referenced 'X))
+   (sig 'v (val-decl (named-reference 'X))
         'X (type-opaque-decl)
-        'Y (type-alias-decl (named-referenced 'X))))
+        'Y (type-alias-decl (named-reference 'X))))
 
   (check-sig-matches
    (sig 'X (type-opaque-decl)
-        'Y (type-alias-decl (named-referenced 'X)))
+        'Y (type-alias-decl (named-reference 'X)))
    (sig 'Y (type-opaque-decl)))
 
   (let ([x #'x]
         [I  (sig 't (type-opaque-decl))]
         [I* (sig 't (type-alias-decl (Int)))]
         [J  (sig 's (type-opaque-decl) 't (type-opaque-decl))]
-        [J* (sig 's (type-opaque-decl) 't (type-alias-decl (named-referenced 's)))])
+        [J* (sig 's (type-opaque-decl) 't (type-alias-decl (named-reference 's)))])
     (check-sig-matches I* I)
     (check-sig-matches J* J)
 

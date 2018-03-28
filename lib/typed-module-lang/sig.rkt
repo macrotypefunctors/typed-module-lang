@@ -136,7 +136,7 @@
     ;; the same name. thus they should have been accepted by the
     ;; initial check.
 
-    [[(named-reference x) (named-referenced x)] #t]
+    [[(named-reference x) (named-reference x)] #t]
     [[(named-reference x) _]
      (=> cont)
      (match (lookup env x)

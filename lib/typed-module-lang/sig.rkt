@@ -127,28 +127,7 @@
 (define (type-matches? env A B)
   (match* [A B]
 
-    ;; two identical named-reference types are equal; this handles the case of
-    ;; two opaque types as well as preemtively matching aliases that
-    ;; are obviously the same. if they are not identical then try to
-    ;; reduce them by looking up type aliases. if we determine that
-    ;; one is an opaque type, then we can fail because the only way
-    ;; two opaque types can be the same is if they are referred to by
-    ;; the same name. thus they should have been accepted by the
-    ;; initial check.
-
-    [[(named-reference x) (named-reference x)] #t]
-    [[(named-reference x) _]
-     (=> cont)
-     (match (lookup env x)
-       [(type-alias-decl A*) (type-matches? env A* B)]
-       [_ (cont)])]
-    [[_ (named-reference y)]
-     (=> cont)
-     (match (lookup env y)
-       [(type-alias-decl B*) (type-matches? env A B*)]
-       [_ (cont)])]
-
-    ;; similar for dotted expressions although "M.x <: N.x" requires
+    ;; type matching for dotted expressions "M.x <: N.x" requires a
     ;; check if "M = N". according to ATAPL this is undecidable in
     ;; general, and there are very confusing circumstances that can
     ;; arise when we try to seal M or N. thus it is easier when M and
@@ -168,9 +147,11 @@
        [(type-alias-decl B*) (type-matches? env A B*)]
        [_ (cont)])]
 
-    ;; TODO: arrow types
-
-    [[_ _] (equal? A B)]))
+    [[_ _]
+     ;; TODO: these envs are different. How do we convert between them so
+     ;;       that we can call `subtype?` with *it's* notion of environment
+     ;;       instead of ours?
+     (subtype?/recur env A B type-matches?)]))
 
 ;; ModExpr ModExpr -> Bool
 (define (mod-expr-equal? M N)

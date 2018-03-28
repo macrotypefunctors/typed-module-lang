@@ -68,23 +68,34 @@
 ;;       and also whether it's the right thing to use in the
 ;;       type-def-var rule
 
+(define (subtype? G τ1 τ2)
+  (subtype?/recur G τ1 τ2 subtype?))
 
-;; Env Type Type -> Boolean
-(define/match (subtype? G τ1 τ2)
-  [[_ (Arrow τ1-ins τ1-out) (Arrow τ2-ins τ2-out)]
-   (define (<: a b) (subtype? G a b))
-   (and (andmap <: τ2-ins τ1-ins)
-        (<: τ1-out τ2-out))]
+;; Env Type Type [Env Type Type -> Boolean] -> Boolean
+(define (subtype?/recur G τ1 τ2 recur-subtype?)
+  (match* [τ1 τ2]
+    [[(Arrow τ1-ins τ1-out) (Arrow τ2-ins τ2-out)]
+     (define (<: a b) (recur-subtype? G a b))
+     (and (andmap <: τ2-ins τ1-ins)
+          (<: τ1-out τ2-out))]
 
-  [[_ (named-reference x) (named-reference y)]
-   (or (free-identifier=? x y)
-       (match* [(env-lookup-type-decl x)
-                (env-lookup-type-decl y)]
-         [[(type-alias-decl τ1*) _] (subtype? G τ1* τ2)]
-         [[_ (type-alias-decl τ2*)] (subtype? G τ1 τ2*)]
-         [[_ _] #f]))]
+    ;; two identical named-reference types are equal; this handles the case of
+    ;; two opaque types as well as preemtively matching aliases that
+    ;; are obviously the same. if they are not identical then try to
+    ;; reduce them by looking up type aliases. if we determine that
+    ;; one is an opaque type, then we can fail because the only way
+    ;; two opaque types can be the same is if they are referred to by
+    ;; the same name. thus they should have been accepted by the
+    ;; initial check.
+    [[(named-reference x) (named-reference y)]
+     (or (free-identifier=? x y)
+         (match* [(env-lookup-type-decl x)
+                  (env-lookup-type-decl y)]
+           [[(type-alias-decl τ1*) _] (recur-subtype? G τ1* τ2)]
+           [[_ (type-alias-decl τ2*)] (recur-subtype? G τ1 τ2*)]
+           [[_ _] #f]))]
 
-  [[_ _ _] (equal? τ1 τ2)])
+    [[_ _] (equal? τ1 τ2)]))
 
 ;; Env Type Type -> Boolean
 (define (type=? τ1 τ2)

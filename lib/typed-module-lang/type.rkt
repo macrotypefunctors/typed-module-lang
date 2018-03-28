@@ -72,12 +72,12 @@
   (subtype?/recur G τ1 τ2 subtype?))
 
 ;; Env Type Type [Env Type Type -> Boolean] -> Boolean
-(define (subtype?/recur G τ1 τ2 recur-subtype?)
-  (match* [τ1 τ2]
-    [[(Arrow τ1-ins τ1-out) (Arrow τ2-ins τ2-out)]
+(define (subtype?/recur G A B recur-subtype?)
+  (match* [A B]
+    [[(Arrow τa-ins τa-out) (Arrow τb-ins τb-out)]
      (define (<: a b) (recur-subtype? G a b))
-     (and (andmap <: τ2-ins τ1-ins)
-          (<: τ1-out τ2-out))]
+     (and (andmap <: τb-ins τa-ins)
+          (<: τa-out τb-out))]
 
     ;; two identical named-reference types are equal; this handles the case of
     ;; two opaque types as well as preemtively matching aliases that
@@ -88,18 +88,43 @@
     ;; the same name. thus they should have been accepted by the
     ;; initial check.
     [[(named-reference x) (named-reference y)]
-     (or (free-identifier=? x y)
-         (match* [(env-lookup-type-decl x)
-                  (env-lookup-type-decl y)]
-           [[(type-alias-decl τ1*) _] (recur-subtype? G τ1* τ2)]
-           [[_ (type-alias-decl τ2*)] (recur-subtype? G τ1 τ2*)]
-           [[_ _] #f]))]
+     #:when (free-identifier=? x y)
+     #t]
+    ;; TODO: would it be nicer to create a match pattern to match
+    ;;       named-references bound to type-alias-decls?
+    [[(named-reference x) _]
+     (=> cont)
+     (match (env-lookup-type-decl G x)
+       [(type-alias-decl A*) (recur-subtype? G A* B)]
+       [_ (cont)])]
+    [[_ (named-reference y)]
+     (=> cont)
+     (match (env-lookup-type-decl G y)
+       [(type-alias-decl B*) (recur-subtype? G A B*)]
+       [_ (cont)])]
 
-    [[_ _] (equal? τ1 τ2)]))
+    [[_ _] (equal? A B)]))
 
 ;; Env Type Type -> Boolean
 (define (type=? τ1 τ2)
   (and (subtype? τ1 τ2)
        (subtype? τ2 τ1)))
 
-;; TODO: change implicit ⇐ rule to use subtype?
+
+;; ---------------------------------------------------------
+
+;; type-named-reference-map :
+;; [X -> Y] [TypeWNamedRef X] -> [TypeWNamedRef Y]
+(define (type-named-reference-map f τ)
+  (define (tnrmap-f t)
+    (type-named-reference-map f t))
+  (match τ
+    [(named-reference x)
+     (named-reference (f x))]
+    [(Arrow ins out)
+     (Arrow (map tnrmap-f ins)
+            (type-named-reference-map f out))]
+    ;; TODO: how do we know whether τ contains a
+    ;; named-reference or not?
+    [_ τ]))
+

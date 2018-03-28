@@ -54,8 +54,9 @@
 ;; An EnvBinding is one of
 ;;  - SigComponent
 ;;  - Signature
-;; An Env is a [Hash Symbol EnvBinding] representing the types (opaque
-;; or alias) and modules (their signatures) in scope.
+;; An Env is a [Listof [List Id EnvBinding]]
+;; representing the types (opaque or alias) and modules
+;; (their signatures) in scope.
 ;; TODO: think about symbols vs. identifiers more!
 
 (define (sig-env->type-env env)
@@ -76,9 +77,9 @@
 ;; Env PiSig PiSig -> Bool
 (define (pi-sig-matches? env A B)
   (match-define (pi-sig A-x A-in A-out) A)
-  (match-define (pi-sig B-x B-in B-out) B)
+  (match-define (pi-sig B-x B-in B-out) B)  ; B-x is an Id
   (define A-out* (signature-subst A-out A-x B-x))
-  (define env/out (hash-set env (syntax-e B-x) B-in))
+  (define env/out (cons (list B-x B-in) env))
   (and (signature-matches? env B-in A-in)
        ;; we add B-in to the environment here because it is the most
        ;; specific type that both signatures need to be compatible with
@@ -91,18 +92,34 @@
 
 ;; ---------------------------------------------------------
 
+
 ;; Env Sig Sig -> Bool
 (define (sig-matches? env A B)
+  ;; TODO: use this to convert both *defs* and *refs* for
+  ;;       types in sigs
+  (define (sig-sym->id sym)
+    (datum->syntax #f sym))
+  (define (type-map-sym->id t)
+    (type-named-reference-map sig-sym->id t))
+  (define (sig-component-map-sym->id comp)
+    (match comp
+      [(type-alias-decl t) (type-alias-decl (type-map-sym->id t))]
+      [(type-opaque-decl) comp]
+      [(val-decl t) (val-decl (type-map-sym->id t))]))
   (define env*
     (for/fold ([env* env])
               ([(A-x A-comp) (in-hash A)])
-      (hash-set env* A-x A-comp)))
+      (cons (list (sig-sym->id A-x)
+                  (sig-component-map-sym->id A-comp))
+            env*)))
 
   (for/and ([(B-x B-comp) (in-hash B)])
     (define A-comp
       (hash-ref A B-x #f))
     (and A-comp
-         (sig-component-matches? env* A-comp B-comp))))
+         (sig-component-matches? env*
+                                 (sig-component-map-sym->id A-comp)
+                                 (sig-component-map-sym->id B-comp)))))
 
 ;; Env SigComp SigComp -> Bool
 (define (sig-component-matches? env A B)
@@ -160,14 +177,17 @@
 
 ;; -----------------------------------------------------
 
-;; Env Symbol -> EnvBinding or #f
+;; Env Id -> EnvBinding or #f
 (define (lookup env x)
-  (hash-ref env x #f))
+  (match (assoc x env free-identifier=?)
+    [(list _ env-binding) env-binding]
+    [_ #f]))
 
 ;; Env ModExpr Symbol -> EnvBinding or #f
 (define (lookup/mod-expr env M x)
   ;; TODO: handle cases other than ModExpr is an Id
-  (match (lookup env (syntax-e M))
+  (unless (identifier? M) (error 'TODO))
+  (match (lookup env M)
     [(? hash? sig)
      (define comp (hash-ref sig x #f))
      (and comp (qualify-component M comp))]

@@ -8,7 +8,8 @@
          racket/match
          macrotypes-nonstx/expand-check-sugar
          macrotypes-nonstx/type-prop
-         macrotypes-nonstx/type-check)
+         macrotypes-nonstx/type-check
+         "type.rkt")
 
 ;; -------------------------------------------------------------------
 ;; type checking within a mod
@@ -50,6 +51,39 @@
   #:out-stx defn-
   #:stop-ids '()
   #:bad-output (raise-syntax-error #f "expected a type or val declaration" defn))
+
+;; typechecking expressions within a mod
+(define-expand-check-relation tc/chk
+  ;; G : Env
+  [G expr type -> expr-]
+  [G ⊢ expr ≫ expr- ⇐ type]
+  [G ⊢ expr ⇐ type]
+  [≫ expr-]
+  #:in-stx expr
+  #:out-stx expr-
+  #:stop-ids (map first G)
+  #:bad-output (raise-syntax-error #f "expected a typed expression" expr))
+
+(define-expand-check-relation tc
+  ;; G : Env
+  [G expr -> expr- type]
+  [G ⊢ expr ≫ expr- ⇒ type]
+  [G ⊢ expr]
+  [≫ expr- ⇒ type]
+  #:in-stx expr
+  #:out-stx expr-
+  #:stop-ids (map first G)
+  #:bad-output (raise-syntax-error #f "expected a typed expression" expr)
+  #:implicit-rule
+  [⊢≫⇐
+   [G ⊢ expr ⇐ τ-expected]
+   (ec G ⊢ expr ≫ expr- ⇒ τ-actual)
+   (unless (subtype? G τ-actual τ-expected)
+     (raise-syntax-error #f
+       (format "type mismatch\n  expected: ~v\n  given:    ~v"
+               τ-expected τ-actual)
+       expr))
+   (er ⊢≫⇐ ≫ expr-)])
 
 ;; -------------------------------------------------------------------
 ;; expanding types

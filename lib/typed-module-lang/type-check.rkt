@@ -118,3 +118,14 @@
   #:stop-ids '()
   #:bad-output
   (raise-syntax-error #f "expected a typed module expression" module-expr))
+
+(define-expand-check-relation sc/def
+  [external-G module-def -> module-def- intro-env]
+  [external-G ⊢ module-def ≫ module-def- modsigdef⇒ intro-env]
+  [external-G ⊢ module-def]
+  [≫ module-def- modsigdef⇒ intro-env]
+  #:in-stx module-def
+  #:out-stx module-def-
+  #:stop-ids '()
+  #:bad-output
+  (raise-syntax-error #f "expected a typed module definition" module-def))

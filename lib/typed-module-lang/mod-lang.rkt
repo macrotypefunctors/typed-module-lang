@@ -1,7 +1,8 @@
 #lang racket/base
 
 (provide (all-from-out "core-lang.rkt")
-         (rename-out [temporary-module-begin #%module-begin])
+         (rename-out [mod-lang-module-begin #%module-begin])
+         define-module
          mod)
 
 (require syntax/parse/define
@@ -12,19 +13,36 @@
                      racket/syntax
                      macrotypes-nonstx/type-prop
                      "type-check.rkt"
-                     "sig.rkt"))
+                     "sig.rkt"
+                     "util/for-acc.rkt"))
 
-;; *Temporary* module-begin form.
-;; For now, expect a single module-expr
-;; and print its signature
+;; --------------------------------------------------------------
 
-(define-syntax temporary-module-begin
+;; A whole program for mod-lang follows this rule
+
+(begin-for-syntax
+  ;; mod-lang-sc-passes :
+  ;; [Listof Stx] -> (values [Listof Stx] ???Env)
+  (define (mod-lang-sc-passes ds)
+    (define-values [env ds/1]
+      (for/list/acc ([G '()])
+                    ([d (in-list ds)])
+        (ec G ⊢ d ≫ d- modsigdef⇒ G+)
+        (values (append G+ G)
+                d-)))
+    (values ds/1 env)))
+
+;; The module-begin form.
+;; For now, expect a series of define-module forms
+;; and print the output environment with the signatures
+
+(define-syntax mod-lang-module-begin
   (syntax-parser
-    [(_ m:expr)
-     (ec '() ⊢ #'m ≫ #'m- sig⇒ sig)
-     (println sig)
-     #'(#%module-begin
-        m-)]))
+    [(_ d:expr ...)
+     (define-values [ds- G]
+       (mod-lang-sc-passes (attribute d)))
+     (println G)
+     #`(#%module-begin #,@ds-)]))
 
 ;; --------------------------------------------------------------
 
@@ -40,6 +58,16 @@
 
 ;; --------------------------------------------------------------
 
+(define-typed-syntax define-module
+  #:datum-literals [=]
+  [⊢≫modsigdef⇒
+   [external-G ⊢ #'(_ name:id = m:expr)]
+   (ec external-G ⊢ #'m ≫ #'m- sig⇒ s)
+   (er ⊢≫modsigdef⇒ ≫ #`(begin (define-syntax name #f) m-)
+       modsigdef⇒ (list (list #'name s)))])
+
+;; --------------------------------------------------------------
+
 ;; The `mod` form looks sort of like "core-lang.rkt"'s
 ;; module-begin form, except that it has an output type
 
@@ -50,10 +78,10 @@
    ;; the module-sig should definitely *not*
    ;; include bindings from the external-G
    #:with name (generate-temporary 'mod)
-   (define-values [ds- type-env val-env]
+   (define-values [ds- module-env]
      (core-lang-tc-passes (attribute d)))
    ;; TODO: include the type-env too
-   (define module-sig (module-env->sig val-env))
+   (define module-sig (module-env->sig module-env))
    (er ⊢≫sig⇒
        ≫ #`(begin #,@ds-)
        sig⇒ module-sig)])

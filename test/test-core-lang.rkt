@@ -5,4 +5,5 @@
 
 (val x : Int = 5)
 (val z : Nit = x)
-(val y : Int = x)
+(val plus : Op2 = +)
+;(val bad : Int = (plus 1 2))

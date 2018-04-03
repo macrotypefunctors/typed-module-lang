@@ -1,13 +1,18 @@
 #lang racket/base
 
-(provide Int
-         ->
+(provide (for-syntax core-lang-tc-passes)
+         ; types
+         Int ->
+         ; forms
          val
          type
-         (rename-out [core-lang-module-begin #%module-begin])
-         #%datum
          #%var
-         (for-syntax core-lang-tc-passes))
+         (rename-out
+          [core-lang-module-begin #%module-begin]
+          [core-lang-datum #%datum]
+          [core-lang-app #%app]
+          ;; prim ops
+          [core-lang-+ +]))
 
 (require syntax/parse/define
          macrotypes-nonstx/type-macros
@@ -137,11 +142,6 @@
 
 ;; for now, no `inst` type inference
 
-(define-typed-syntax #%datum
-  [⊢≫⇒
-   [G ⊢ #'(_ . i:exact-integer)]
-   (er ⊢≫⇒ ≫ #''i ⇒ (Int))])
-
 (define-typed-syntax #%var
   ;; as an expression
   [⊢≫⇒
@@ -157,5 +157,40 @@
    ;;       should use an identifier or a symbol, or whether it should
    ;;       use something else entirely
    (type-stx (named-reference #'x))])
+
+(define-typed-syntax core-lang-datum
+  [⊢≫⇒
+   [G ⊢ #'(_ . i:exact-integer)]
+   (er ⊢≫⇒ ≫ #''i ⇒ (Int))])
+
+(define-typed-syntax core-lang-app
+  ;; as an expression. no type application thus far,
+  ;; but the module layer will need to override #%app
+  ;; for functor application.
+  [⊢≫⇒
+   [G ⊢ #'(_ fn:expr arg:expr ...)]
+   (printf "typing function ...")
+   (ec G ⊢ #'fn ≫ #'fn- ⇒ (Arrow τ-ins τ-out))
+   (unless (= (length τ-ins) (length (attribute arg)))
+     (raise-syntax-error #f
+       (format "wrong number of argument to function, expected ~a, got ~a"
+               (length τ-ins)
+               (length (attribute arg)))
+       this-syntax))
+   (printf "    : ~v -> ~v\n" τ-ins τ-out)
+   (printf "typing args ...")
+   (define/syntax-parse (arg- ...)
+     (for/list ([τ (in-list τ-ins)]
+                [e (in-list (attribute arg))])
+       (ec G ⊢ e ≫ e- ⇐ τ)
+       e-))
+   (er ⊢≫⇒ ≫ #`(#%app fn- arg- ...) ⇒ τ-out)])
+
+(define-syntax core-lang-+
+  (id-transformer
+   (cases
+    [⊢≫⇒
+     [G ⊢ _]
+     (er ⊢≫⇒ ≫ #'(#%expression +) ⇒ (Arrow (list (Int) (Int)) (Int)))])))
 
 ;; ----------------------------------------------------

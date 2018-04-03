@@ -15,6 +15,7 @@
                      macrotypes-nonstx/type-prop
                      "type-check.rkt"
                      "sig.rkt"
+                     "type.rkt"
                      "util/for-acc.rkt"))
 
 ;; --------------------------------------------------------------
@@ -52,10 +53,13 @@
 (begin-for-syntax
   (define (module-env->sig module-G)
     (for/hash ([p (in-list module-G)])
-      (match-define (list val-id val-type) p)
+      (match-define (list val-id binding) p)
+      (define decl
+        (match binding
+          [(val-binding type) (val-decl type)]
+          [(type-binding type-decl) type-decl]))
       ;; convert identifiers into symbols for the signature
-      (values (syntax-e val-id)
-              (val-decl val-type)))))
+      (values (syntax-e val-id) decl))))
 
 ;; --------------------------------------------------------------
 

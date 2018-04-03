@@ -13,13 +13,13 @@
 ;;   - (type-alias-decl Type)
 ;;   - (newtype-decl Id Type)
 
-(struct type-alias-decl [type])
+(struct type-alias-decl [type] #:prefab)
 (struct newtype-decl [id type]
   ; id is the identifier for the constructor
   ; type is the argument to the constructor
   ; NOTE: don't substitute for type during subtype relation
   ;       newtype =/= type alias !
-  )
+  #:prefab)
 
 ;; a DeclKindEnv is a [Listof [List Id DeclKind]]
 ;; a DeclKind is one of

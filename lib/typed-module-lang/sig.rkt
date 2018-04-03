@@ -25,8 +25,9 @@
 ;;  - (type-alias-decl Type)
 ;;  - (type-opaque-decl)
 ;;  - (val-decl Type)
+;; TODO: newtype-decl
 
-(struct type-alias-decl [type] #:prefab)
+; type-alias-decl from "type.rkt"
 (struct type-opaque-decl [] #:prefab)
 (struct val-decl [type] #:prefab)
 
@@ -44,28 +45,29 @@
 ;;  - BaseType
 ;;  - (Arrow [Listof Type] Type)
 ;;  - (named-reference Symbol)
-;;  - (dot ModExpr Symbol)
-;;  - TODO: ∀
+;;  - (dot ModExpr Symbol)   <- added by module system
 
 (struct dot [mod type-name] #:prefab)
 
 ;; ---------------------------------------------------------
 
-;; An EnvBinding is one of
-;;  - SigComponent
-;;  - Signature
-;; An Env is a [Listof [List Id EnvBinding]]
-;; representing the types (opaque or alias) and modules
-;; (their signatures) in scope.
-;; TODO: think about symbols vs. identifiers more!
+;; a Env is a [Listof [List Id EnvBinding]], just as in "type.rkt"
+;; an EnvBinding is one of
+;;   - (val-binding Type)
+;;   - (type-binding TypeDecl)
+;;   - (mod-binding Sig)    <- added by module system
+;; a TypeDecl is one of
+;;   - (type-alias-decl Type)
+;;   - (newtype-decl Id Type)
+;;   - (type-opaque-decl)   <- added by module system
 
-(define (sig-env->type-env env)
-  (for/list ([(x comp) (in-hash env)])
-    ('TODO)))
-
+(struct mod-binding [sig] #:prefab)
 
 ;; TODO: it may be a better idea to use an id-table instead of a hash
 ;; with symbol keys. need to discuss pros / cons
+
+
+;; ---------------------------------------------------------
 
 ;; Env Signature Signature -> Bool
 (define (signature-matches? env A B)
@@ -106,13 +108,23 @@
       [(type-alias-decl t) (type-alias-decl (type-map-sym->id t))]
       [(type-opaque-decl) comp]
       [(val-decl t) (val-decl (type-map-sym->id t))]))
+
+  (define (sig-component->env-binding comp)
+    (match comp
+      [(val-decl t) (val-binding (type-map-sym->id t))]
+      [comp (type-binding (sig-component-map-sym->id comp))]))
+
+  ;; extend the env with all the components from B
+  ;; REMEMBER: the entries in this env are EnvBindings!
+  ;;           refer to the definition of Env
   (define env*
     (for/fold ([env* env])
               ([(A-x A-comp) (in-hash A)])
       (cons (list (sig-sym->id A-x)
-                  (sig-component-map-sym->id A-comp))
+                  (sig-component->env-binding A-comp))
             env*)))
 
+  ;; check that all components in B correspond with components in A
   (for/and ([(B-x B-comp) (in-hash B)])
     (define A-comp
       (hash-ref A B-x #f))
@@ -213,9 +225,9 @@
 (module+ test
   (require rackunit racket/function)
   (define-binary-check (check-sig-matches A B)
-    (signature-matches? (hash) A B))
+    (signature-matches? '() A B))
   (define-binary-check (check-not-sig-matches A B)
-    (not (signature-matches? (hash) A B)))
+    (not (signature-matches? '() A B)))
 
   (define sig hash)
 

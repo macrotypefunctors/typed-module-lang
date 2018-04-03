@@ -29,7 +29,7 @@
 ;; a Env is a [Listof [List Id EnvBinding]]
 ;; an EnvBinding is one of
 ;;   - (val-binding Type)
-;;   - (type-binding TypeDefn)
+;;   - (type-binding TypeDecl)
 
 (struct val-binding [type])
 (struct type-binding [decl])

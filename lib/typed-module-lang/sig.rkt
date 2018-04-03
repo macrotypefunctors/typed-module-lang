@@ -78,15 +78,23 @@
 
 ;; Env PiSig PiSig -> Bool
 (define (pi-sig-matches? env A B)
+  ;; A-x and B-x are already Id! no need to promote symbols to ids
+  ;; like what had to be done for sig matching.
+  ;; still, we have to substitue the argument names. it is arbitrary
+  ;; which one we substitue as long as they are equal when matching
+  ;; the range signatures.
   (match-define (pi-sig A-x A-in A-out) A)
-  (match-define (pi-sig B-x B-in B-out) B)  ; B-x is an Id
+  (match-define (pi-sig B-x B-in B-out) B)
   (define A-out* (signature-subst A-out A-x B-x))
-  (define env/out (cons (list B-x B-in) env))
+  (define env* (cons (list B-x (mod-binding B-in)) env))
   (and (signature-matches? env B-in A-in)
        ;; we add B-in to the environment here because it is the most
        ;; specific type that both signatures need to be compatible with
-       (signature-matches? env/out A-out* B-out)))
+       (signature-matches? env* A-out* B-out)))
 
+;; Sig Id Id -> Sig
+;; substitutes all occurences of x-from with x-to, in all
+;; mod expressions in the given signature.
 (define (signature-subst S x-from x-to)
   (unless (free-identifier=? x-from x-to)
     (error "TODO. identifiers not equal"))
@@ -167,12 +175,12 @@
      #t]
     [[(dot M x) _]
      (=> cont)
-     (match (lookup/mod-expr env M x)
+     (match (mod-expr-lookup env M x)
        [(type-alias-decl A*) (type-matches? env A* B)]
        [_ (cont)])]
     [[_ (dot N y)]
      (=> cont)
-     (match (lookup/mod-expr env N y)
+     (match (mod-expr-lookup env N y)
        [(type-alias-decl B*) (type-matches? env A B*)]
        [_ (cont)])]
 
@@ -189,21 +197,19 @@
 
 ;; -----------------------------------------------------
 
-;; Env Id -> EnvBinding or #f
-(define (lookup env x)
-  (match (assoc x env free-identifier=?)
-    [(list _ env-binding) env-binding]
+;; Env Id -> Sig or #f
+(define (env-lookup-sig env M)
+  (match (assoc M env free-identifier=?)
+    [(list _ (mod-binding sig)) sig]
     [_ #f]))
 
 ;; Env ModExpr Symbol -> EnvBinding or #f
-(define (lookup/mod-expr env M x)
+(define (mod-expr-lookup env M x)
   ;; TODO: handle cases other than ModExpr is an Id
   (unless (identifier? M) (error 'TODO))
-  (match (lookup env M)
-    [(? hash? sig)
-     (define comp (hash-ref sig x #f))
-     (and comp (qualify-component M comp))]
-    [_ #f]))
+  (define sig (env-lookup-sig env M))
+  (define comp (and sig (hash-ref sig x #f)))
+  (and comp (qualify-component M comp)))
 
 ;; ModExpr Component -> Component
 ;; prefix all named types in the component with module 'M'

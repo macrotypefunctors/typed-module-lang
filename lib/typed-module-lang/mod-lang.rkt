@@ -10,6 +10,7 @@
          (except-in "core-lang.rkt" #%module-begin)
          (for-syntax racket/base
                      racket/match
+                     racket/pretty
                      racket/syntax
                      macrotypes-nonstx/type-prop
                      "type-check.rkt"
@@ -41,7 +42,7 @@
     [(_ d:expr ...)
      (define-values [ds- G]
        (mod-lang-sc-passes (attribute d)))
-     (println G)
+     (pretty-print G)
      #`(#%module-begin #,@ds-)]))
 
 ;; --------------------------------------------------------------

@@ -13,6 +13,7 @@
          macrotypes-nonstx/type-macros
          (for-syntax racket/base
                      racket/match
+                     racket/pretty
                      racket/syntax
                      macrotypes-nonstx/type-prop
                      macrotypes-nonstx/id-transformer
@@ -72,6 +73,7 @@
     [(_ d:expr ...)
      (define-values [ds- G]
        (core-lang-tc-passes (attribute d)))
+     (pretty-print G)
      #`(#%module-begin #,@ds-)]))
 
 ;; ----------------------------------------------------

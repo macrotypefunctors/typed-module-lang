@@ -187,7 +187,7 @@
    (er ⊢≫⇒ ≫ #`(#%app fn- arg- ...) ⇒ τ-out)])
 
 (define-syntax core-lang-+
-  (id-transformer
+  (var-like-transformer
    (cases
     [⊢≫⇒
      [G ⊢ _]

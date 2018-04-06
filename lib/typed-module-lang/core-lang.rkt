@@ -163,22 +163,40 @@
    [G ⊢ #'(_ . i:exact-integer)]
    (er ⊢≫⇒ ≫ #''i ⇒ (Int))])
 
+(begin-for-syntax
+  ;; traverses type aliases until an Arrow type is found.
+  ;; Env Type -> Arrow or #f
+  (define (find-arrow-type G τ)
+    (match τ
+      [(Arrow _ _) τ]
+      [(named-reference x)
+       (match (env-lookup-type-decl G x)
+         [(type-alias-decl τ*) (find-arrow-type G τ*)]
+         [_ #f])]
+      [_ #f])))
+
 (define-typed-syntax core-lang-app
   ;; as an expression. no type application thus far,
   ;; but the module layer will need to override #%app
   ;; for functor application.
   [⊢≫⇒
    [G ⊢ #'(_ fn:expr arg:expr ...)]
-   (printf "typing function ...")
-   (ec G ⊢ #'fn ≫ #'fn- ⇒ (Arrow τ-ins τ-out))
+   (ec G ⊢ #'fn ≫ #'fn- ⇒ τ-fn)
+   ;; extract function type
+   (define-values [τ-ins τ-out]
+     (match (find-arrow-type G τ-fn)
+       [(Arrow i o) (values i o)]
+       [_ (raise-syntax-error #f
+            (format "cannot apply non-function type ~a" τ-fn)
+            this-syntax)]))
+   ;; compare # of arguments
    (unless (= (length τ-ins) (length (attribute arg)))
      (raise-syntax-error #f
        (format "wrong number of argument to function, expected ~a, got ~a"
                (length τ-ins)
                (length (attribute arg)))
        this-syntax))
-   (printf "    : ~v -> ~v\n" τ-ins τ-out)
-   (printf "typing args ...")
+   ;; typecheck arguments
    (define/syntax-parse (arg- ...)
      (for/list ([τ (in-list τ-ins)]
                 [e (in-list (attribute arg))])

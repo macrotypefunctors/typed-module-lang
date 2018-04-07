@@ -12,7 +12,10 @@
           [core-lang-datum #%datum]
           [core-lang-app #%app]
           ;; prim ops
-          [core-lang-+ +]))
+          [core-lang-+ +]
+          [core-lang-- -]
+          [core-lang-* *]
+          [core-lang-/ /]))
 
 (require syntax/parse/define
          macrotypes-nonstx/type-macros
@@ -204,11 +207,24 @@
        e-))
    (er ⊢≫⇒ ≫ #`(#%app fn- arg- ...) ⇒ τ-out)])
 
-(define-syntax core-lang-+
+(define-for-syntax (typed-prim-transformer internal type)
   (var-like-transformer
    (cases
     [⊢≫⇒
      [G ⊢ _]
-     (er ⊢≫⇒ ≫ #'(#%expression +) ⇒ (Arrow (list (Int) (Int)) (Int)))])))
+     (er ⊢≫⇒ ≫ internal ⇒ type)])))
 
-;; ----------------------------------------------------
+(define-syntax define-typed-prim
+  (syntax-parser
+    [(_ X:id ty)
+     #:with core-lang-X (format-id #'X "core-lang-~a" #'X)
+     #'(define-syntax core-lang-X
+         (typed-prim-transformer #'X ty))]
+
+    [(_ [X:id ...] ty)
+     #'(begin
+         (define-typed-prim X ty) ...)]))
+
+(define-typed-prim
+  [+ - * /]
+  (Arrow (list (Int) (Int)) (Int)))

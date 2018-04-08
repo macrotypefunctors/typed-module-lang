@@ -21,6 +21,11 @@
     (val add : Op2 = +)
     (val four : Int = (add 2 2))
 
+    (val add1 : (-> Int Int) =
+         (let ([one 1])
+           (λ ([x : Int])
+             (add x one))))
+
     (val adadad : Op2 =
          (λ (a b)
            (add (add a b) (add a b))))

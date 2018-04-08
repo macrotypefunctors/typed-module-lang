@@ -13,6 +13,7 @@
           [core-lang-app #%app]
           [core-lang-lambda lambda]
           [core-lang-lambda λ]
+          [core-lang-let let]
           ;; prim ops
           [core-lang-+ +]
           [core-lang-- -]
@@ -233,6 +234,23 @@
        (ec G ⊢ e ≫ e- ⇐ τ)
        e-))
    (er ⊢≫⇒ ≫ #`(#%app fn- arg- ...) ⇒ τ-out)])
+
+(define-typed-syntax core-lang-let
+  [⊢≫⇒
+   [G ⊢ #'(_ ([x:id e:expr] ...) body:expr)]
+   #:do [(define-values [es- τ_xs]
+           (for/lists (es- τ_xs)
+                      ([e (in-list (attribute e))])
+             (ec G ⊢ e ≫ e- ⇒ τ_e)
+             (values e- τ_e)))]
+   #:with [e- ...] es-
+   (define body-G
+     (append (map list (attribute x) (map val-binding τ_xs))
+             G))
+   (ec body-G ⊢ #'body ≫ #'body- ⇒ τ_b)
+   (er ⊢≫⇒ ≫ #`(let ([x e-] ...) body-) ⇒ τ_b)])
+
+;; ---------------------------------------------------------
 
 (define-for-syntax (typed-prim-transformer internal type)
   (var-like-transformer

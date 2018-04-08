@@ -5,9 +5,17 @@
 
 ;; ---------------------------------------------------------
 
+(provide pi-sig)
+
 ;; A Signature is one of:
 ;;  - Sig
 ;;  - PiSig
+
+;; A PiSig is represented with a
+;;   (pi-sig Id Signature Signature)
+
+;; The id `x` is a binding position with the scope of `out`
+(struct pi-sig [x in out] #:prefab)
 
 ;; ---------------------------------------------------------
 
@@ -16,7 +24,8 @@
 
 ;; ---------------------------------------------------------
 
-(provide val-decl)
+(provide type-opaque-decl
+         val-decl)
 
 ;; A Sig is represented with a
 ;;   (Hashof Symbol SigComponent)
@@ -33,13 +42,7 @@
 
 ;; ---------------------------------------------------------
 
-;; A PiSig is represented with a
-;;   (pi-sig Id Signature Signature)
-
-;; The id `x` is a binding position with the scope of `out`
-(struct pi-sig [x in out] #:prefab)
-
-;; ---------------------------------------------------------
+(provide dot)
 
 ;; A Type is one of:
 ;;  - BaseType
@@ -51,23 +54,31 @@
 
 ;; ---------------------------------------------------------
 
-;; a Env is a [Listof [List Id EnvBinding]], just as in "type.rkt"
+(provide mod-binding
+         sig-binding)
+
+;; an Env is a [Listof [List Id EnvBinding]], just as in "type.rkt"
 ;; an EnvBinding is one of
 ;;   - (val-binding Type)
 ;;   - (type-binding TypeDecl)
-;;   - (mod-binding Sig)    <- added by module system
+;;   - (mod-binding Signature)    <- added by module system
+;;   - (sig-binding Signature)    <- added by module system
 ;; a TypeDecl is one of
 ;;   - (type-alias-decl Type)
 ;;   - (newtype-decl Id Type)
 ;;   - (type-opaque-decl)   <- added by module system
 
 (struct mod-binding [sig] #:prefab)
+(struct sig-binding [sig] #:prefab)
 
 ;; TODO: it may be a better idea to use an id-table instead of a hash
 ;; with symbol keys. need to discuss pros / cons
 
 
 ;; ---------------------------------------------------------
+
+(provide signature-matches?
+         type-matches?)
 
 ;; Env Signature Signature -> Bool
 (define (signature-matches? env A B)

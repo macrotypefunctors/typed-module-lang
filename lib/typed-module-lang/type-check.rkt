@@ -129,3 +129,18 @@
   #:stop-ids '()
   #:bad-output
   (raise-syntax-error #f "expected a typed module definition" module-def))
+
+(define-expand-check-relation sc/sig
+  [external-G signature-expr -> signature-expr-]
+  [external-G ⊢ signature-expr ≫ signature-expr- signature⇐]
+  [external-G ⊢ signature-expr]
+  [≫ signature-expr- signature⇐]
+  #:in-stx signature-expr
+  #:out-stx signature-expr-
+  #:stop-ids (map first external-G)
+  #:bad-output (raise-syntax-error #f "expected a signature" signature-expr))
+
+;; Env Stx -> Signature
+(define (expand-signature G signature-stx)
+  (match-define (type-stx s) (expand/sc/sig-in G signature-stx))
+  s)

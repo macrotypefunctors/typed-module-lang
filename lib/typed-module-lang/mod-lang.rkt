@@ -4,7 +4,9 @@
          #%datum
          (rename-out [mod-lang-module-begin #%module-begin])
          define-module
-         mod)
+         mod
+         define-signature
+         sig)
 
 (require syntax/parse/define
          macrotypes-nonstx/type-macros
@@ -13,6 +15,7 @@
                      racket/match
                      racket/pretty
                      racket/syntax
+                     racket/hash
                      macrotypes-nonstx/type-prop
                      "type-check.rkt"
                      "sig.rkt"
@@ -25,7 +28,7 @@
 
 (begin-for-syntax
   ;; mod-lang-sc-passes :
-  ;; [Listof Stx] -> (values [Listof Stx] ???Env)
+  ;; [Listof Stx] -> (values [Listof Stx] Env)
   (define (mod-lang-sc-passes ds)
     (define-values [env ds/1]
       (for/list/acc ([G '()])
@@ -70,7 +73,15 @@
    [external-G ⊢ #'(_ name:id = m:expr)]
    (ec external-G ⊢ #'m ≫ #'m- sig⇒ s)
    (er ⊢≫modsigdef⇒ ≫ #`(begin (define-syntax name #f) m-)
-       modsigdef⇒ (list (list #'name s)))])
+       modsigdef⇒ (list (list #'name (mod-binding s))))])
+
+(define-typed-syntax define-signature
+  #:datum-literals [=]
+  [⊢≫modsigdef⇒
+   [external-G ⊢ #'(_ name:id = s:expr)]
+   (define signature (expand-signature external-G #'s))
+   (er ⊢≫modsigdef⇒ ≫ #`(define-syntax name #f)
+       modsigdef⇒ (list (list #'name (sig-binding signature))))])
 
 ;; --------------------------------------------------------------
 
@@ -91,5 +102,54 @@
    (er ⊢≫sig⇒
        ≫ #`(begin #,@ds-)
        sig⇒ module-sig)])
+
+(define-typed-syntax sig
+  #:literals [val type]
+  #:datum-literals [: =]
+  [⊢≫signature⇐
+   [external-G ⊢ #'(_ {~alt (val val-name : val-type)
+                            (type alias-name = alias-type)
+                            (type opaque-name)}
+                      ...)]
+
+   (define dke
+     (append (attribute alias-name)
+             (attribute opaque-name)))
+
+   ;; [Listof [List Id Symbol]]
+   (define type-name->syms
+     (for/list ([id (in-list dke)])
+       (list id (syntax-e id))))
+
+   (define (resolve-ids τ)
+     (type-named-reference-map
+      (λ (x)
+        (match (assoc x type-name->syms free-identifier=?)
+          [#f x]
+          [(list _ sym) sym]))
+      τ))
+
+   (define val-τs
+     (for/list ([type-stx (in-list (attribute val-type))])
+       (resolve-ids (expand-type/dke dke type-stx))))
+
+   (define alias-τs
+     (for/list ([type-stx (in-list (attribute alias-type))])
+       (resolve-ids (expand-type/dke dke type-stx))))
+
+   (type-stx
+    (hash-union
+     ; values
+     (for/hash ([id (in-list (attribute val-name))]
+                [τ (in-list val-τs)])
+       (values (syntax-e id) (val-decl τ)))
+     ; aliases
+     (for/hash ([id (in-list (attribute alias-name))]
+                [τ (in-list alias-τs)])
+       (values (syntax-e id) (type-alias-decl τ)))
+     ; opaque types
+     (for/hash ([id (in-list (attribute opaque-name))])
+       (values (syntax-e id) (type-opaque-decl)))))])
+
 
 ;; --------------------------------------------------------------

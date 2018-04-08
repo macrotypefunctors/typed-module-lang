@@ -1,4 +1,12 @@
 #lang s-exp typed-module-lang/mod-lang
+
+(define-signature S =
+  (sig (type Nit)
+       (type Op2 = (-> Nit Nit Nit))
+       (val x : Nit)
+       (val three : Int)
+       (val four : Nit)))
+
 (define-module M =
   (mod
    (type Op2 = (-> Nit Int Nit))

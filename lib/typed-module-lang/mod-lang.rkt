@@ -11,10 +11,12 @@
          sig)
 
 (require syntax/parse/define
+         racket/local
          macrotypes-nonstx/type-macros
          (rename-in (except-in "core-lang.rkt" #%module-begin)
                     [#%var core-#%var])
          (for-syntax racket/base
+                     racket/list
                      racket/match
                      racket/pretty
                      racket/syntax
@@ -71,6 +73,14 @@
 ;; --------------------------------------------------------------
 
 (define-typed-syntax #%var
+  ;; as a module
+  [⊢≫sig⇒
+   [G ⊢ #'(_ x:id)]
+   (define s
+     (match (assoc #'x G free-identifier=?)
+       [(list _ (mod-binding s)) s]
+       [_ (raise-syntax-error #f "expected a module" #'x)]))
+   (er ⊢≫sig⇒ ≫ #'x sig⇒ s)]
   ;; as a signature
   [⊢≫signature⇐
    [G ⊢ #'(_ x:id)]
@@ -89,7 +99,7 @@
   [⊢≫modsigdef⇒
    [external-G ⊢ #'(_ name:id = m:expr)]
    (ec external-G ⊢ #'m ≫ #'m- sig⇒ s)
-   (er ⊢≫modsigdef⇒ ≫ #`(begin (define-syntax name #f) m-)
+   (er ⊢≫modsigdef⇒ ≫ #`(define name m-)
        modsigdef⇒ (list (list #'name (mod-binding s))))])
 
 (define-typed-syntax define-signature
@@ -112,12 +122,17 @@
    ;; the module-sig should definitely *not*
    ;; include bindings from the external-G
    #:with name (generate-temporary 'mod)
-   (define-values [ds- module-env]
-     (core-lang-tc-passes (attribute d)))
-   ;; TODO: include the type-env too
-   (define module-sig (module-env->sig module-env))
+   #:do [(define-values [ds- module-env]
+           (core-lang-tc-passes (attribute d)))
+         ;; TODO: include the type-env too
+         (define module-sig (module-env->sig module-env))]
+   #:with [x ...] (for/list ([entry (in-list module-env)]
+                             #:when (val-binding? (second entry)))
+                    (first entry))
+   #:with [[k/v ...] ...]
+   #'[['x x] ...]
    (er ⊢≫sig⇒
-       ≫ #`(begin #,@ds-)
+       ≫ #`(local [#,@ds-] (hash k/v ... ...))
        sig⇒ module-sig)])
 
 (define-typed-syntax seal

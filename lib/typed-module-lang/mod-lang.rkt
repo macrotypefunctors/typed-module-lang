@@ -2,15 +2,18 @@
 
 (provide (all-from-out "core-lang.rkt")
          #%datum
+         #%var
          (rename-out [mod-lang-module-begin #%module-begin])
          define-module
          mod
+         seal
          define-signature
          sig)
 
 (require syntax/parse/define
          macrotypes-nonstx/type-macros
-         (except-in "core-lang.rkt" #%module-begin)
+         (rename-in (except-in "core-lang.rkt" #%module-begin)
+                    [#%var core-#%var])
          (for-syntax racket/base
                      racket/match
                      racket/pretty
@@ -67,6 +70,20 @@
 
 ;; --------------------------------------------------------------
 
+(define-typed-syntax #%var
+  ;; as a signature
+  [⊢≫signature⇐
+   [G ⊢ #'(_ x:id)]
+   ;; don't return er, return type-stx with a *sig value* instead
+   (match (assoc #'x G free-identifier=?)
+     [(list _ (sig-binding s)) (type-stx s)]
+     [_ (raise-syntax-error #f "expected a signature" #'x)])]
+  [else
+   #:with (_ . rst) this-syntax
+   #'(core-#%var . rst)])
+
+;; --------------------------------------------------------------
+
 (define-typed-syntax define-module
   #:datum-literals [=]
   [⊢≫modsigdef⇒
@@ -102,6 +119,20 @@
    (er ⊢≫sig⇒
        ≫ #`(begin #,@ds-)
        sig⇒ module-sig)])
+
+(define-typed-syntax seal
+  #:datum-literals [:>]
+  [⊢≫sig⇒
+   [external-G ⊢ #'(_ m:expr :> s-stx:expr)]
+   #:do [(ec external-G ⊢ #'m ≫ #'m- sig⇒ s-actual)
+         (define s-expected (expand-signature external-G #'s-stx))]
+   #:fail-unless (signature-matches? external-G s-actual s-expected)
+   ;; TODO: smaller error messages that say something like
+   ;;       "this component is missing" or "this component has the wrong type"
+   "signature mismatch"
+   (er ⊢≫sig⇒
+       ≫ #'m-
+       sig⇒ s-expected)])
 
 (define-typed-syntax sig
   #:literals [val type]

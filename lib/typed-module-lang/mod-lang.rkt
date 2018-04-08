@@ -1,6 +1,7 @@
 #lang racket/base
 
 (provide (all-from-out "core-lang.rkt")
+         #%datum
          (rename-out [mod-lang-module-begin #%module-begin])
          define-module
          mod)

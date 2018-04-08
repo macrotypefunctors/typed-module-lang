@@ -11,6 +11,8 @@
           [core-lang-module-begin #%module-begin]
           [core-lang-datum #%datum]
           [core-lang-app #%app]
+          [core-lang-lambda lambda]
+          [core-lang-lambda λ]
           ;; prim ops
           [core-lang-+ +]
           [core-lang-- -]
@@ -20,6 +22,7 @@
 (require syntax/parse/define
          macrotypes-nonstx/type-macros
          (for-syntax racket/base
+                     racket/list
                      racket/match
                      racket/pretty
                      racket/syntax
@@ -177,6 +180,30 @@
          [(type-alias-decl τ*) (find-arrow-type G τ*)]
          [_ #f])]
       [_ #f])))
+
+(define-typed-syntax core-lang-lambda
+  [⊢≫⇐
+   [G ⊢ #'(_ (x:id ...) body:expr) ⇐ τ_expected]
+   (match-define (Arrow τ_as τ_b) (find-arrow-type G τ_expected))
+   (define body-G
+     (append (map list (attribute x) (map val-binding τ_as))
+             G))
+   (ec body-G ⊢ #'body ≫ #'body- ⇐ τ_b)
+   (er ⊢≫⇐ ≫ #`(lambda (x ...) body-))]
+  [⊢≫⇒
+   [G ⊢ #'(_ ([x:id : τ-stx] ...) body:expr)]
+   (define dke
+     (for/list ([entry (in-list G)]
+                #:when (type-binding? (second entry)))
+       (first entry)))
+   (define (expand-type τ-stx)
+     (expand-type/dke dke τ-stx))
+   (define τ_xs (map expand-type (attribute τ-stx)))
+   (define body-G
+     (append (map list (attribute x) (map val-binding τ_xs))
+             G))
+   (ec body-G ⊢ #'body ≫ #'body- ⇒ τ_body)
+   (er ⊢≫⇒ ≫ #`(lambda (x ...) body-) ⇒ (Arrow τ_xs τ_body))])
 
 (define-typed-syntax core-lang-app
   ;; as an expression. no type application thus far,

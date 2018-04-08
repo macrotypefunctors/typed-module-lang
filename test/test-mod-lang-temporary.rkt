@@ -5,7 +5,8 @@
        (type Op2 = (-> Nit Nit Nit))
        (val x : Nit)
        (val three : Int)
-       (val four : Nit)))
+       (val four : Nit)
+       (val adadad : Op2)))
 
 (define-module M =
   (seal
@@ -19,6 +20,10 @@
 
     (val add : Op2 = +)
     (val four : Int = (add 2 2))
+
+    (val adadad : Op2 =
+         (λ (a b)
+           (add (add a b) (add a b))))
 
     ;(val not-op2 : Op2 = 3)
     ;(val bad-app : Int = (3 4))

@@ -119,7 +119,7 @@
    [⊢ #'(_ X:id . stuff)]
    (er ⊢≫decl-kinds⇒
        ≫ #'(type X . stuff)
-       decl-kinds⇒ (list (list #'X 'type-alias)))]
+       decl-kinds⇒ (list #'X))]
   ;; pass 2
   [⊢≫decl⇒
    [dke ⊢ #'(_ X = τ-stx)]

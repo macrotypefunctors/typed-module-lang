@@ -21,10 +21,7 @@
   ;       newtype =/= type alias !
   #:prefab)
 
-;; a DeclKindEnv is a [Listof [List Id DeclKind]]
-;; a DeclKind is one of
-;;   - 'type-alias
-;;   - 'newtype
+;; a DeclKindEnv is a [Listof Id]
 
 ;; a Env is a [Listof [List Id EnvBinding]]
 ;; an EnvBinding is one of
@@ -127,4 +124,3 @@
     ;; TODO: how do we know whether τ contains a
     ;; named-reference or not?
     [_ τ]))
-

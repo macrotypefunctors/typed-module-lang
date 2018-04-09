@@ -1,3 +1,13 @@
 #lang info
+
 (define collection 'multi)
-(define deps '("base"))
+
+(define deps
+  '("base"
+    "macrotypes-nonstx"
+    ))
+
+(define build-deps
+  '("rackunit-lib"
+    ))
+

@@ -1,6 +1,6 @@
 #lang racket/base
 
-(provide ref def)
+(provide ref* ref def)
 
 (require syntax/parse/define
          (only-in scribble/manual
@@ -22,13 +22,15 @@
 ;;   @#,ref[#%dot e]
 ;;   @#,ref[#%dot τ]
 
-(define-simple-macro (ref id:id suffix:id ...)
-  (elemref (list context-overloading-link (list 'id 'suffix ...))
-           (racketkeywordfont (symbol->string 'id))
-           (superscript (symbol->string 'suffix)) ...
+(define (ref* id . sufs)
+  (elemref (list context-overloading-link (cons id sufs))
+           (racketkeywordfont (symbol->string id))
+           (map (λ (s) (superscript (symbol->string s))) sufs)
            #:underline? #f))
+
+(define-simple-macro (ref id:id suffix:id ...)
+  (ref* 'id 'suffix ...))
 
 (define-simple-macro (def id:id suffix:id ...)
   (elemtag (list context-overloading-link (list 'id 'suffix ...))
            (ref id suffix ...)))
-

@@ -13,3 +13,8 @@
    (val mul2 : (-> T T))))
 
 (define-module Math* = (seal Math :> MATH))
+
+(define-module Example =
+  (mod
+   (val double : (-> Int Int) =
+     Math.mul2)))

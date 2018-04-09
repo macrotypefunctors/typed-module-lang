@@ -3,6 +3,7 @@
 (provide (all-from-out "core-lang.rkt")
          #%datum
          #%var
+         #%dot
          (rename-out [mod-lang-module-begin #%module-begin]
                      [mod-lang-lambda lambda]
                      [mod-lang-lambda λ]
@@ -100,6 +101,21 @@
 
 ;; --------------------------------------------------------------
 
+(define-typed-syntax #%dot
+  ;; as an expression
+  [⊢≫⇒
+   [G ⊢ #'(_ m:id x:id)]
+   (ec G ⊢ #'m ≫ #'m- sig⇒ s)
+   (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
+   (define comp (hash-ref s (syntax-e #'x)))
+   (unless (val-decl? comp) (raise-syntax-error #f "expected a mod" #'x))
+   (er ⊢≫⇒ ≫ #'(hash-ref m- 'x) ⇒ (dot #'m (syntax-e #'x)))]
+
+  ;; as a type
+  )
+
+;; --------------------------------------------------------------
+
 (define-typed-syntax define-module
   #:datum-literals [=]
   [⊢≫modsigdef⇒
@@ -129,8 +145,9 @@
    ;; include bindings from the external-G
    #:with name (generate-temporary 'mod)
    #:do [(define-values [ds- module-env]
-           (core-lang-tc-passes (attribute d)))
+           (core-lang-tc-passes external-G (attribute d)))
          ;; TODO: include the type-env too
+         ;; TODO: determine if the above comment is still relevant?
          (define module-sig (module-env->sig module-env))]
    #:with [x ...] (for/list ([entry (in-list module-env)]
                              #:when (val-binding? (second entry)))

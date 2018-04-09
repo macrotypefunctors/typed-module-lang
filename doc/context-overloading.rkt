@@ -2,7 +2,8 @@
 
 (provide ref def)
 
-(require (only-in scribble/manual
+(require syntax/parse/define
+         (only-in scribble/manual
                   elemref
                   elemtag
                   racket
@@ -21,18 +22,13 @@
 ;;   @#,ref[#%dot e]
 ;;   @#,ref[#%dot τ]
 
-(define-syntax ref
-  (syntax-rules ()
-    [(ref id suffix ...)
-     (elemref (list context-overloading-link (list 'id 'suffix ...))
-              (racketkeywordfont (symbol->string 'id))
-              (superscript (symbol->string 'suffix)) ...
-              #:underline? #f)]))
+(define-simple-macro (ref id:id suffix:id ...)
+  (elemref (list context-overloading-link (list 'id 'suffix ...))
+           (racketkeywordfont (symbol->string 'id))
+           (superscript (symbol->string 'suffix)) ...
+           #:underline? #f))
 
-(define-syntax def
-  (syntax-rules ()
-    [(def id suffix ...)
-     (elemtag (list context-overloading-link (list 'id 'suffix ...))
-              (racket id)
-              (superscript (symbol->string 'suffix)) ... )]))
+(define-simple-macro (def id:id suffix:id ...)
+  (elemtag (list context-overloading-link (list 'id 'suffix ...))
+           (ref id suffix ...)))
 

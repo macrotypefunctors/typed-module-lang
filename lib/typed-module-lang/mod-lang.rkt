@@ -3,18 +3,24 @@
 (provide (all-from-out "core-lang.rkt")
          #%datum
          #%var
-         (rename-out [mod-lang-module-begin #%module-begin])
+         (rename-out [mod-lang-module-begin #%module-begin]
+                     [mod-lang-lambda lambda]
+                     [mod-lang-lambda λ]
+                     [core-#%app #%app])
          define-module
          mod
          seal
          define-signature
-         sig)
+         sig
+         Π)
 
 (require syntax/parse/define
          racket/local
          macrotypes-nonstx/type-macros
-         (rename-in (except-in "core-lang.rkt" #%module-begin)
-                    [#%var core-#%var])
+         (rename-in (except-in "core-lang.rkt" #%module-begin λ)
+                    [#%var core-#%var]
+                    [lambda core-lambda]
+                    [#%app core-#%app])
          (for-syntax racket/base
                      racket/list
                      racket/match
@@ -197,5 +203,30 @@
      (for/hash ([id (in-list (attribute opaque-name))])
        (values (syntax-e id) (type-opaque-decl)))))])
 
+
+;; --------------------------------------------------------------
+
+(define-typed-syntax Π
+  #:datum-literals [:]
+  [⊢≫signature⇐
+   [external-G ⊢ #'(_ ([x:id : A-stx]) B-stx)]
+   (define A (expand-signature external-G #'A-stx))
+   (define body-G (cons (list #'x (mod-binding A)) external-G))
+   (define B (expand-signature body-G #'B-stx))
+   (type-stx (pi-sig #'x A B))])
+
+;; --------------------------------------------------------------
+
+(define-typed-syntax mod-lang-lambda
+  ;; as a module
+  [⊢≫sig⇒
+   [G ⊢ #'(_ ([x:id : A-stx]) body-module:expr)]
+   (define A (expand-signature G #'A-stx))
+   (define body-G (cons (list #'x (mod-binding A)) G))
+   (ec body-G ⊢ #'body-module ≫ #'body-module- sig⇒ B)
+   (er ⊢≫sig⇒ ≫ #'(λ (x) body-module-) sig⇒ (pi-sig #'x A B))]
+  [else
+   #:with (_ . rst) this-syntax
+   #'(core-lambda . rst)])
 
 ;; --------------------------------------------------------------

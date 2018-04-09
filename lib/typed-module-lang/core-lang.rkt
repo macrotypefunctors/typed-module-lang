@@ -57,8 +57,10 @@
 
 (begin-for-syntax
   ;; core-lang-tc-passes :
-  ;; [Listof Stx] -> (values [Listof Stx] Env)
-  (define (core-lang-tc-passes ds)
+  ;; Env [Listof Stx] -> (values [Listof Stx] Env)
+  ;; the env returned is *not* an extension of external-G, it
+  ;; is collection of new bindings introduced by the declarations.
+  (define (core-lang-tc-passes external-G ds)
     ;; pass 1
     (define-values [decl-kind-env ds/1]
       (for/list/acc ([dke '()])
@@ -73,18 +75,23 @@
         (ec decl-kind-env ⊢ d ≫ d- decl⇒ G+)
         (values (append G+ G)
                 d-)))
+    (define env+external
+      ;; note: important that 'env' entries are "closer"
+      ;;   than entries in 'external-G'
+      (append env external-G))
     ;; pass 3
     (define ds/3
       (for/list ([d (in-list ds/2)])
-        (ec env ⊢ d ≫ d- val-def⇐)
+        (ec env+external ⊢ d ≫ d- val-def⇐)
         d-))
+    ; note: return just 'env', not 'env+external' (see purpose statement)
     (values ds/3 env)))
 
 (define-syntax core-lang-module-begin
   (syntax-parser
     [(_ d:expr ...)
      (define-values [ds- G]
-       (core-lang-tc-passes (attribute d)))
+       (core-lang-tc-passes '() (attribute d)))
      (pretty-print G)
      #`(#%module-begin #,@ds-)]))
 

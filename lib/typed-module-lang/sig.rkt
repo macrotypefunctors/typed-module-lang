@@ -55,7 +55,9 @@
 ;; ---------------------------------------------------------
 
 (provide mod-binding
-         sig-binding)
+         sig-binding
+         env-lookup-module
+         env-lookup-signature)
 
 ;; an Env is a [Listof [List Id EnvBinding]], just as in "type.rkt"
 ;; an EnvBinding is one of
@@ -74,6 +76,17 @@
 ;; TODO: it may be a better idea to use an id-table instead of a hash
 ;; with symbol keys. need to discuss pros / cons
 
+;; Env Id -> Signature or #f
+(define (env-lookup-module G x)
+  (match (assoc x G free-identifier=?)
+    [(list _ (mod-binding s)) s]
+    [_ #f]))
+
+;; Env Id -> Signature or #f
+(define (env-lookup-signature G x)
+  (match (assoc x G free-identifier=?)
+    [(list _ (sig-binding s)) s]
+    [_ #f]))
 
 ;; ---------------------------------------------------------
 
@@ -208,17 +221,11 @@
 
 ;; -----------------------------------------------------
 
-;; Env Id -> Sig or #f
-(define (env-lookup-sig env M)
-  (match (assoc M env free-identifier=?)
-    [(list _ (mod-binding sig)) sig]
-    [_ #f]))
-
 ;; Env ModExpr Symbol -> EnvBinding or #f
 (define (mod-expr-lookup env M x)
   ;; TODO: handle cases other than ModExpr is an Id
   (unless (identifier? M) (error 'TODO))
-  (define sig (env-lookup-sig env M))
+  (define sig (env-lookup-signature env M))
   (define comp (and sig (hash-ref sig x #f)))
   (and comp (qualify-component M comp)))
 

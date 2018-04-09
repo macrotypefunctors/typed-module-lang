@@ -83,17 +83,17 @@
   [⊢≫sig⇒
    [G ⊢ #'(_ x:id)]
    (define s
-     (match (assoc #'x G free-identifier=?)
-       [(list _ (mod-binding s)) s]
-       [_ (raise-syntax-error #f "expected a module" #'x)]))
+     (or (env-lookup-module G #'x)
+         (raise-syntax-error #f "expected a module" #'x)))
    (er ⊢≫sig⇒ ≫ #'x sig⇒ s)]
   ;; as a signature
   [⊢≫signature⇐
    [G ⊢ #'(_ x:id)]
+   (define s
+     (or (env-lookup-signature G #'x)
+         (raise-syntax-error #f "expected a module" #'x)))
    ;; don't return er, return type-stx with a *sig value* instead
-   (match (assoc #'x G free-identifier=?)
-     [(list _ (sig-binding s)) (type-stx s)]
-     [_ (raise-syntax-error #f "expected a signature" #'x)])]
+   (type-stx s)]
   [else
    #:with (_ . rst) this-syntax
    #'(core-#%var . rst)])

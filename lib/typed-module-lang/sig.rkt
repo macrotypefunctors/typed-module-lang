@@ -249,10 +249,15 @@
 
 ; ModExpr Type -> SigComp
 (define (qualify-type M type)
+  (define (qual τ) (qualify-type M τ))
   (match type
     [(named-reference x) (dot M x)]
     [(dot M x) (error 'qualify-type "TODO: qualifying a dot type?")]
-    [_ type]))
+    [(Arrow ins out) (Arrow (map qual ins) (qual out))]
+    [_
+     ;; TODO: how do we know if the type contains more
+     ;;  references?
+     type]))
 
 ;; -----------------------------------------------------
 

@@ -23,12 +23,14 @@
                     [lambda core-lambda]
                     [#%app core-#%app])
          (for-syntax racket/base
+                     racket/function
+                     racket/hash
                      racket/list
                      racket/match
                      racket/pretty
                      racket/syntax
-                     racket/hash
                      macrotypes-nonstx/type-prop
+                     (only-in syntax/parse [attribute @])
                      "type-check.rkt"
                      "sig.rkt"
                      "type.rkt"
@@ -58,7 +60,7 @@
   (syntax-parser
     [(_ d:expr ...)
      (define-values [ds- G]
-       (mod-lang-sc-passes (attribute d)))
+       (mod-lang-sc-passes (@ d)))
      (pretty-print G)
      #`(#%module-begin #,@ds-)]))
 
@@ -67,15 +69,35 @@
 ;; Converting internal type environments to "external" signatures
 
 (begin-for-syntax
+  ;; Env -> Sig
   (define (module-env->sig module-G)
+    (define type-ids
+      (for/list ([entry (in-list module-G)]
+                 #:when (type-binding? (second entry)))
+        (first entry)))
+
+    (define type-id-syms
+      (map list type-ids (map syntax-e type-ids)))
+
+    (define (resolve-ids τ)
+      (type-named-reference-map
+       (λ (x)
+         (match (assoc x type-id-syms free-identifier=?)
+           [#f x]
+           [(list _ sym) sym]))
+       τ))
+
     (for/hash ([p (in-list module-G)])
-      (match-define (list val-id binding) p)
+      (match-define (list id binding) p)
       (define decl
         (match binding
-          [(val-binding type) (val-decl type)]
-          [(type-binding type-decl) type-decl]))
+          [(val-binding τ) (val-decl (resolve-ids τ))]
+          [(type-binding decl)
+           (match decl
+             [(type-alias-decl τ) (type-alias-decl (resolve-ids τ))]
+             [(type-opaque-decl) decl])]))
       ;; convert identifiers into symbols for the signature
-      (values (syntax-e val-id) decl))))
+      (values (syntax-e id) decl))))
 
 ;; --------------------------------------------------------------
 
@@ -107,9 +129,11 @@
    [G ⊢ #'(_ m:id x:id)]
    (ec G ⊢ #'m ≫ #'m- sig⇒ s)
    (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
-   (define comp (hash-ref s (syntax-e #'x)))
-   (unless (val-decl? comp) (raise-syntax-error #f "expected a mod" #'x))
-   (er ⊢≫⇒ ≫ #'(hash-ref m- 'x) ⇒ (dot #'m (syntax-e #'x)))]
+   (define τ_x
+     (match (sig-ref s (syntax-e #'x))
+       [(val-decl τ) (qualify-type #'m τ)]
+       [_ (raise-syntax-error #f "not a value binding" #'x)]))
+   (er ⊢≫⇒ ≫ #'(hash-ref m- 'x) ⇒ τ_x)]
 
   ;; as a type
   )
@@ -145,7 +169,7 @@
    ;; include bindings from the external-G
    #:with name (generate-temporary 'mod)
    #:do [(define-values [ds- module-env]
-           (core-lang-tc-passes external-G (attribute d)))
+           (core-lang-tc-passes external-G (@ d)))
          ;; TODO: include the type-env too
          ;; TODO: determine if the above comment is still relevant?
          (define module-sig (module-env->sig module-env))]
@@ -181,45 +205,19 @@
                             (type opaque-name)}
                       ...)]
 
-   (define dke
-     (append (attribute alias-name)
-             (attribute opaque-name)))
+   (define dke (append (@ alias-name) (@ opaque-name)))
 
-   ;; [Listof [List Id Symbol]]
-   (define type-name->syms
-     (for/list ([id (in-list dke)])
-       (list id (syntax-e id))))
+   (define (expand-type type-stx)
+     (expand-type/dke dke type-stx))
 
-   (define (resolve-ids τ)
-     (type-named-reference-map
-      (λ (x)
-        (match (assoc x type-name->syms free-identifier=?)
-          [#f x]
-          [(list _ sym) sym]))
-      τ))
-
-   (define val-τs
-     (for/list ([type-stx (in-list (attribute val-type))])
-       (resolve-ids (expand-type/dke dke type-stx))))
-
-   (define alias-τs
-     (for/list ([type-stx (in-list (attribute alias-type))])
-       (resolve-ids (expand-type/dke dke type-stx))))
+   (define val-τs (map expand-type (@ val-type)))
+   (define alias-τs (map expand-type (@ alias-type)))
 
    (type-stx
-    (hash-union
-     ; values
-     (for/hash ([id (in-list (attribute val-name))]
-                [τ (in-list val-τs)])
-       (values (syntax-e id) (val-decl τ)))
-     ; aliases
-     (for/hash ([id (in-list (attribute alias-name))]
-                [τ (in-list alias-τs)])
-       (values (syntax-e id) (type-alias-decl τ)))
-     ; opaque types
-     (for/hash ([id (in-list (attribute opaque-name))])
-       (values (syntax-e id) (type-opaque-decl)))))])
-
+    (module-env->sig
+     (append (map list (@ val-name) (map val-binding val-τs))
+             (map list (@ alias-name) (map (compose type-binding type-alias-decl) alias-τs))
+             (map list (@ opaque-name) (map (const (type-binding (type-opaque-decl))) (@ opaque-name))))))])
 
 ;; --------------------------------------------------------------
 

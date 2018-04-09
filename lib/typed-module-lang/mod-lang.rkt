@@ -136,6 +136,15 @@
    (er ⊢≫⇒ ≫ #'(hash-ref m- 'x) ⇒ τ_x)]
 
   ;; as a type
+  [⊢≫type⇐
+   [dke ⊢ #'(_ m:id x:id)]
+   (define G (filter (compose mod-binding? second) dke))
+   (ec G ⊢ #'m ≫ _ sig⇒ s)
+   (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
+   (define comp (sig-ref s (syntax-e #'x)))
+   (unless (or (type-alias-decl? comp) (type-opaque-decl? comp))
+     (raise-syntax-error #f "not a type binding" #'x))
+   (type-stx (dot #'m (syntax-e #'x)))]
   )
 
 ;; --------------------------------------------------------------

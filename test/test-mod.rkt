@@ -16,5 +16,12 @@
 
 (define-module Example =
   (mod
-   (val double : (-> Int Int) =
+   (val double : (-> Int Math.T) =
      Math.mul2)))
+
+(define-module Example* =
+  (mod
+   (val double : (-> Math*.T Math*.T) =
+     Math*.mul2)))
+
+;; NOTE: Math.T and Math*.T are incompatible (intentional)

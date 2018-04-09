@@ -5,11 +5,16 @@
 
 ;; ---------------------------------------------------------
 
-(provide pi-sig)
+(provide sig sig? sig-ref
+         pi-sig)
 
 ;; A Signature is one of:
 ;;  - Sig
 ;;  - PiSig
+
+(define sig (procedure-rename hash 'sig))
+(define sig-ref (procedure-rename hash-ref 'sig-ref))
+(define (sig? s) (and (hash? s) (immutable? s)))
 
 ;; A PiSig is represented with a
 ;;   (pi-sig Id Signature Signature)
@@ -19,13 +24,8 @@
 
 ;; ---------------------------------------------------------
 
-;; A ModExpr is one of:
-;;  - Id
-
-;; ---------------------------------------------------------
-
-(provide type-opaque-decl
-         val-decl)
+(provide type-opaque-decl type-opaque-decl?
+         val-decl val-decl?)
 
 ;; A Sig is represented with a
 ;;   (Hashof Symbol SigComponent)
@@ -42,7 +42,12 @@
 
 ;; ---------------------------------------------------------
 
-(provide dot)
+;; A ModExpr is one of:
+;;  - Id
+
+;; ---------------------------------------------------------
+
+(provide dot dot?)
 
 ;; A Type is one of:
 ;;  - BaseType
@@ -54,8 +59,8 @@
 
 ;; ---------------------------------------------------------
 
-(provide mod-binding
-         sig-binding
+(provide mod-binding mod-binding?
+         sig-binding sig-binding?
          env-lookup-module
          env-lookup-signature)
 
@@ -77,12 +82,14 @@
 ;; with symbol keys. need to discuss pros / cons
 
 ;; Env Id -> Signature or #f
+;; return signature of module with given name
 (define (env-lookup-module G x)
   (match (assoc x G free-identifier=?)
     [(list _ (mod-binding s)) s]
     [_ #f]))
 
 ;; Env Id -> Signature or #f
+;; return signature defined by given name
 (define (env-lookup-signature G x)
   (match (assoc x G free-identifier=?)
     [(list _ (sig-binding s)) s]
@@ -221,15 +228,18 @@
 
 ;; -----------------------------------------------------
 
-;; Env ModExpr Symbol -> EnvBinding or #f
+(provide mod-expr-lookup
+         qualify-type)
+
+;; Env ModExpr Symbol -> SigComp or #f
 (define (mod-expr-lookup env M x)
   ;; TODO: handle cases other than ModExpr is an Id
   (unless (identifier? M) (error 'TODO))
-  (define sig (env-lookup-signature env M))
+  (define sig (env-lookup-module env M))
   (define comp (and sig (hash-ref sig x #f)))
   (and comp (qualify-component M comp)))
 
-;; ModExpr Component -> Component
+;; ModExpr SigComp -> SigComp
 ;; prefix all named types in the component with module 'M'
 (define (qualify-component M comp)
   (match comp
@@ -237,7 +247,7 @@
     [(type-alias-decl ty) (type-alias-decl (qualify-type M ty))]
     [(type-opaque-decl)   (type-opaque-decl)]))
 
-;; ModExpr Type -> Component
+; ModExpr Type -> SigComp
 (define (qualify-type M type)
   (match type
     [(named-reference x) (dot M x)]

@@ -9,7 +9,8 @@
          macrotypes-nonstx/expand-check-sugar
          macrotypes-nonstx/type-prop
          macrotypes-nonstx/type-check
-         "type.rkt")
+         "type.rkt"
+         "sig.rkt")
 
 ;; -------------------------------------------------------------------
 ;; type checking within a mod
@@ -78,7 +79,7 @@
   [⊢≫⇐
    [G ⊢ expr ⇐ τ-expected]
    (ec G ⊢ expr ≫ expr- ⇒ τ-actual)
-   (unless (subtype? G τ-actual τ-expected)
+   (unless (type-matches? G τ-actual τ-expected)
      (raise-syntax-error #f
        (format "type mismatch\n  expected: ~v\n  given:    ~v"
                τ-expected τ-actual)

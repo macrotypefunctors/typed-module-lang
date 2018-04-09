@@ -1,4 +1,4 @@
-#lang s-exp typed-module-lang/mod-lang
+#lang typed-module-lang
 
 (define-signature S =
   (sig (type X)

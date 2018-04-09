@@ -1,5 +1,5 @@
 #lang s-exp syntax/module-reader
-typed-module-lang/lang
+typed-module-lang/mod-lang
 #:wrapper1 wrapper1
 
 (define (wrapper1 thunk)

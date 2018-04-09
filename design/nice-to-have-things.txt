@@ -1,0 +1,9 @@
+
+- pretty printing types & signatures
+
+- "FFI" with Racket:
+
+(define-module IntSet
+  (racket-mod
+   (type t)
+   (val union : (-> t t t) = set-union)))

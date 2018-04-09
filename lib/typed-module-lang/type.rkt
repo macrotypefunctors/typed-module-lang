@@ -21,7 +21,9 @@
   ;       newtype =/= type alias !
   #:prefab)
 
-;; a DeclKindEnv is a [Listof Id]
+;; a DeclKindEnv is a [Listof [List Id DeclKind]]
+;;   - 'type
+;;   - 'val
 
 ;; a Env is a [Listof [List Id EnvBinding]]
 ;; an EnvBinding is one of
@@ -30,13 +32,6 @@
 
 (struct val-binding [type])
 (struct type-binding [decl])
-
-;; Env -> [Listof Id]
-(define (env-val-names G)
-  (filter-map (match-lambda
-                [(list X (val-binding _)) X]
-                [_ #f])
-              G))
 
 ;; Env Id -> TypeDecl or #f
 (define (env-lookup-type-decl G X)
@@ -49,6 +44,16 @@
   (match (assoc x G free-identifier=?)
     [(list _ (val-binding τ)) τ]
     [_ #f]))
+
+;; Env -> DeclKindEnv
+;; if it encounters a kind of binding that isn't val/type,
+;; then it passes it through
+(define (env->decl-kind-env G)
+  (for/list ([entry (in-list G)])
+    (match entry
+      [(list x (val-binding _)) (list x 'val)]
+      [(list x (type-binding _)) (list x 'type)]
+      [_ entry])))
 
 ;; ------------------------------------------------------
 

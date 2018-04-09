@@ -64,6 +64,11 @@
          env-lookup-module
          env-lookup-signature)
 
+;; a DeclKindEnv is a [Listof [List Id DeclKind]]
+;;   - 'type
+;;   - 'val
+;;   - (mod-binding Signature)  <- added by module system
+
 ;; an Env is a [Listof [List Id EnvBinding]], just as in "type.rkt"
 ;; an EnvBinding is one of
 ;;   - (val-binding Type)

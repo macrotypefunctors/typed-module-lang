@@ -205,7 +205,8 @@
                             (type opaque-name)}
                       ...)]
 
-   (define dke (append (@ alias-name) (@ opaque-name)))
+   (define dke (map (λ (x) (list x 'type))
+                    (append (@ alias-name) (@ opaque-name))))
 
    (define (expand-type type-stx)
      (expand-type/dke dke type-stx))

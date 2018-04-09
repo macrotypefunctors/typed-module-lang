@@ -62,17 +62,21 @@
   ;; is collection of new bindings introduced by the declarations.
   (define (core-lang-tc-passes external-G ds)
     ;; pass 1
-    (define-values [decl-kind-env ds/1]
+    (define-values [dke ds/1]
       (for/list/acc ([dke '()])
                     ([d (in-list ds)])
         (ec ⊢ d ≫ d- decl-kinds⇒ dke+)
         (values (append dke+ dke)
                 d-)))
+    (define dke+external
+      ;; note: important that 'dke' entries are "closer"
+      ;;   than entries in 'external-G'
+      (append dke (env->decl-kind-env external-G)))
     ;; pass 2
     (define-values [env ds/2]
       (for/list/acc ([G '()])
                     ([d (in-list ds/1)])
-        (ec decl-kind-env ⊢ d ≫ d- decl⇒ G+)
+        (ec dke+external ⊢ d ≫ d- decl⇒ G+)
         (values (append G+ G)
                 d-)))
     (define env+external
@@ -105,10 +109,12 @@
 (define-typed-syntax val
   #:datum-literals [: =]
   ;; pass 1
-  [⊢≫decl-kinds⇒ [⊢ stx] (er ⊢≫decl-kinds⇒ ≫ stx decl-kinds⇒ '())]
+  [⊢≫decl-kinds⇒ [⊢ stx]
+   #:with (_ x:id . _) stx
+   (er ⊢≫decl-kinds⇒ ≫ stx decl-kinds⇒ (list (list #'x 'val)))]
   ;; pass 2
   [⊢≫decl⇒
-   [dke ⊢ #'(_ x : τ-stx . stuff)]
+   [dke ⊢ #'(_ x : τ-stx:expr . stuff)]
    ;(ec dke ⊢ #'τ-stx ≫ τ type⇐)
    (define τ (expand-type/dke dke #'τ-stx))
    (er ⊢≫decl⇒
@@ -118,7 +124,7 @@
   [⊢≫val-def⇐
    ; this G will include all top-level definitions in the program
    ; e can only be typechecked in *this* G
-   [G ⊢ #'(_ x : τ-stx = e)]
+   [G ⊢ #'(_ x : τ-stx = e:expr)]
    (define τ (expand-type #'τ-stx)) ;; don't need to use env because already expanded
    (ec G ⊢ #'e ≫ #'e- ⇐ τ)
    (er ⊢≫val-def⇐ ≫ #`(define x e-))])
@@ -130,7 +136,7 @@
    [⊢ #'(_ X:id . stuff)]
    (er ⊢≫decl-kinds⇒
        ≫ #'(type X . stuff)
-       decl-kinds⇒ (list #'X))]
+       decl-kinds⇒ (list (list #'X 'type)))]
   ;; pass 2
   [⊢≫decl⇒
    [dke ⊢ #'(_ X = τ-stx)]
@@ -200,12 +206,11 @@
    (er ⊢≫⇐ ≫ #`(lambda (x ...) body-))]
   [⊢≫⇒
    [G ⊢ #'(_ ([x:id : τ-stx] ...) body:expr)]
-   (define dke
-     (for/list ([entry (in-list G)]
-                #:when (type-binding? (second entry)))
-       (first entry)))
+   (define dke (env->decl-kind-env G))
+
    (define (expand-type τ-stx)
      (expand-type/dke dke τ-stx))
+
    (define τ_xs (map expand-type (attribute τ-stx)))
    (define body-G
      (append (map list (attribute x) (map val-binding τ_xs))

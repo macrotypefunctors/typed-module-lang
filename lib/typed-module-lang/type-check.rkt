@@ -38,7 +38,7 @@
   [≫ decl- decl⇒ intro-env]
   #:in-stx decl
   #:out-stx decl-
-  #:stop-ids dke
+  #:stop-ids (map first dke)
   #:bad-output (raise-syntax-error #f "expected a type or val declaration" decl))
 
 ;; expand value definitions and typecheck their RHS
@@ -97,7 +97,7 @@
   [≫ ty- type⇐]
   #:in-stx ty
   #:out-stx ty-
-  #:stop-ids dke
+  #:stop-ids (map first dke)
   #:bad-output (raise-syntax-error #f "expected a type" ty))
 
 ;; expand-type/dke : DeclKindEnv Stx -> Type

@@ -26,17 +26,23 @@
 @defform[#:literals [: =]
          (val id : type = expr)]{
 Creates a value binding.
+
+@racketblock[(val hyol : Int = 4620)]
 }
 
 @defform[#:literals [=]
          (type id = @#,racket[_rhs-type])]{
 Declares a type alias, allowing @racket[_id] to be used interchangeably
 with @racket[_rhs-type].
+
+@racketblock[(type CRN = Int)]
 }
 
 @defform[#:literals [=]
          (newtype id = (constructor-id type))]{
 Defines a type with a single unary constructor @racket[_constructor-id].
+
+@racketblock[(newtype Bool = (bool (∀ (X) (-> X X X))))]
 }
 
 @;---------------------------------------------------------------------------------
@@ -99,11 +105,32 @@ These forms are for module expressions.
 @overloaded-listing[m #%var λ #%app]
 
 @defform[(mod def ...)]{
-Creates a module structure consisting of the given definitions.}
+Creates a module structure consisting of the given definitions.
+
+@racketblock[
+(define-module Image =
+  (mod
+    (type Color = Int)
+    (type Image = (-> Int Int Color))
+    (val black : Color = 0)
+    (val white : Color = 100)
+    (val blank : Image = (λ (x y) white))))]}
 
 @defform[#:literals [:>] (seal mod-expr :> sig-expr)]{
 Seals the module @racket[_mod-expr] to be constrained by
-the signature @racket[_sig-expr]. }
+the signature @racket[_sig-expr].
+
+@racketblock[
+(define-signature COUNT
+  (type T)
+  (val dec : (-> T T))
+  (val inc : (-> T T)))
+
+(define-module Count
+  (seal (mod (type T = Int)
+             (val inc : (-> T T) (λ (x) (+ x 1)))
+             (val dec : (-> T T) (λ (x) (- x 1))))
+        <: COUNT))]}
 
 @;---------------------------------------------------------------------------------
 @subsection{Signature Expressions}

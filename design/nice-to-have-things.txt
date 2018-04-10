@@ -1,4 +1,6 @@
 
+- foralls
+
 - pretty printing types & signatures
 
 - "FFI" with Racket:

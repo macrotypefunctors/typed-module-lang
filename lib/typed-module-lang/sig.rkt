@@ -103,7 +103,8 @@
 ;; ---------------------------------------------------------
 
 (provide signature-matches?
-         type-matches?)
+         type-matches?
+         signature-subst)
 
 ;; Env Signature Signature -> Bool
 (define (signature-matches? env A B)
@@ -121,7 +122,7 @@
   ;; the range signatures.
   (match-define (pi-sig A-x A-in A-out) A)
   (match-define (pi-sig B-x B-in B-out) B)
-  (define A-out* (signature-subst A-out A-x B-x))
+  (define A-out* (signature-subst-id A-out A-x B-x))
   (define env* (cons (list B-x (mod-binding B-in)) env))
   (and (signature-matches? env B-in A-in)
        ;; we add B-in to the environment here because it is the most
@@ -129,12 +130,19 @@
        (signature-matches? env* A-out* B-out)))
 
 ;; Sig Id Id -> Sig
-;; substitutes all occurences of x-from with x-to, in all
-;; mod expressions in the given signature.
-(define (signature-subst S x-from x-to)
+;; substitutes module references 'x-from' with 'x-to'
+(define (signature-subst-id S x-from x-to)
   (unless (free-identifier=? x-from x-to)
-    (error "TODO. identifiers not equal"))
+    (error 'signature-subst-id "TODO. identifiers not equal"))
   S)
+
+;; Sig Id Path -> Sig
+;; substites module references 'x-from' with 'path'
+;; TODO: ????????????????????
+(define (signature-subst S x-from path)
+  (unless (identifier? path)
+    (error 'signature-subst "TODO: paths?"))
+  (signature-subst-id S x-from path))
 
 ;; ---------------------------------------------------------
 

@@ -7,7 +7,7 @@
          (rename-out [mod-lang-module-begin #%module-begin]
                      [mod-lang-lambda lambda]
                      [mod-lang-lambda λ]
-                     [core-#%app #%app])
+                     [mod-lang-#%app #%app])
          define-module
          mod
          seal
@@ -255,3 +255,21 @@
    #'(core-lambda . rst)])
 
 ;; --------------------------------------------------------------
+
+(define-typed-syntax mod-lang-#%app
+  ;; as a module
+  [⊢≫sig⇒
+     [G ⊢ #'(_ fun ~! arg:id)]
+     ;; TODO: allow arg to be arbitrary module expression
+     ;;   ... may require figuring out how to solve let vs. submodule ?
+     (ec G ⊢ #'fun ≫ #'fun- sig⇒ (pi-sig x A B))
+     (ec G ⊢ #'arg ≫ #'arg- sig⇒ A*)
+     (unless (signature-matches? G A* A)
+       (raise-syntax-error #f "signature mismatch" #'arg))
+     (define B* (signature-subst B x #'arg))
+     (er ⊢≫sig⇒ ≫ #'(fun- arg-)
+         sig⇒ B*)]
+
+  [else
+   #:with (_ . rst) this-syntax
+   #'(core-#%app . rst)])

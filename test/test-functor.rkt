@@ -5,11 +5,23 @@
        (val x : X)))
 
 (define-module F =
-  (λ ([a : S])
+  (λ ([A : S])
     (mod
      (type Y = Int)
      (val y : Y = 5))))
 
 (define-module F* =
-  (seal F :> (Π ([a : S]) (sig (type Y) (val y : Y)))))
+  (seal F :> (Π ([A : S]) (sig (type Y) (val y : Y)))))
 
+;; ------------
+
+(define-module A =
+  (mod
+   (type X = Int)
+   (val x : X = 5)))
+
+(define-module F<-A =
+  (F A))
+
+(define-module F*<-A =
+  (F* A))

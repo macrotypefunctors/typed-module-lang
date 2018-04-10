@@ -79,6 +79,6 @@
 (define-syntax-rule (overloaded-listing suffix form ... last-form)
   (list "Some of these forms are overloaded by other phases, "
         "so they are distinguished with a superscript "
-        (italic "`" (symbol->string 'suffix) "'") ": "
+        (italic "``" (symbol->string 'suffix) "''") ": "
         (list (ref form suffix) ", ") ...
         (ref last-form suffix) ". "))

@@ -120,7 +120,7 @@ These forms are for signature expressions.
            (@#,racket[type] id)])]{
 Creates a module signature specifying the given value and type bindings.
 A @racket[type] binding with no right-hand side declares the type binding
-to be "opaque". }
+to be ``opaque''. }
 
 @defform[#:literals [:]
          (Π ([id : in-sig-expr]) out-sig-expr)]{

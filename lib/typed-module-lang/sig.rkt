@@ -358,6 +358,11 @@ M.L.T4 = (alias M.J.D)
      ;;  references?
      type]))
 
+(define (qualify-sig qenv sig)
+  ;; TODO: avoid captures?
+  (for/hash ([(x comp) (in-hash sig)])
+    (values x (qualify-component qenv comp))))
+
 ;; -----------------------------------------------------
 
 (module+ test

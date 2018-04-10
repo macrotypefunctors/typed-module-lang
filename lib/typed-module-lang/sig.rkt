@@ -255,12 +255,18 @@ N : (sig (type C))
 
 M = (mod
      (type A)
+     (define-module J : (sig (type D)))
      (define-module L :
        (sig
         (type B)
         (type T1 = A)
         (type T2 = B)
-        (type T3 = N.C))))
+        (type T3 = N.C)
+        (type T4 = J.D))))
+
+A must have M.
+J must have M.
+B must have M.L.
 
 M.L : (sig (type B)
            (type T1 = M.A)
@@ -269,6 +275,7 @@ M.L : (sig (type B)
 M.L.T1 = (alias M.A)
 M.L.T2 = (alias M.L.B)
 M.L.T3 = (alias N.C)
+M.L.T4 = (alias M.J.D)
 
 ;; Path -> Id [Listof Sym]
 (define (path->base+names path)
@@ -280,6 +287,9 @@ M.L.T3 = (alias N.C)
        (path->base+names path*))
      (values base (append xs (list x)))]))
 
+
+;; a QualEnv is a [Hashof Symbol ModPath]
+
 ;; Env ModPath Symbol -> SigComp or #f
 ;; returns corresponding component whose types are
 ;; valid in the scope of 'env'.
@@ -287,52 +297,61 @@ M.L.T3 = (alias N.C)
   (define-values [base xs]
     (path->base+names path))
 
+  ;; QualEnv Sig ModPath -> QualEnv
+  (define (extend-qual-env qenv sig prefix)
+    (for/fold ([qenv qenv])
+              ([(x comp) (in-hash sig)])
+      (match comp
+        [(or (type-alias-decl _)
+             (type-opaque-decl)
+             (mod-decl _))
+         (hash-set qenv x prefix)]
+        [_ qenv])))
+
   (define sig
     (env-lookup-module env base))
 
   (let loop ([sig sig]
-             [xs xs])
+             [xs xs]
+             [qenv '()]
+             [prefix base])
     (and
      (sig? sig)
-     (match xs
-       ['() (sig-ref sig y #f)]
-       [(cons x xs*)
-        (match (sig-ref sig x #f)
-          [(mod-decl sig*)
-           (qualify-??? (loop
+     (let ([qenv* (extend-qual-env qenv sig prefix)])
+       (match xs
+         ['()
+          (define comp (sig-ref sig y #f))
+          (and comp (qualify-component qenv comp))]
 
+         [(cons x xs*)
+          (match (sig-ref sig x #f)
+            [(mod-decl sig*)
+             (define path* (dot path x))
+             (loop sig* xs* qenv* path*)]
+            [_ #f])])))))
 
-  (match path
-    [(dot M sub)
-
-     (define env*
-
-     (match (mod-path-lookup env M sub)
-       [(mod-decl S)
-        (define comp (and (sig? S) (sig-ref sig x #f)))
-        (and comp (qualify-component
-
-  ;; TODO: handle cases other than ModExpr is an Id
-  (unless (identifier? M) (error 'TODO))
-  (define sig (env-lookup-module env M))
-  (define comp (and sig (hash-ref sig x #f)))
-  (and comp (qualify-component M comp)))
-
-
-;; ModExpr SigComp -> SigComp
-;; prefix all named types in the component with module 'M'
-(define (qualify-component M comp)
+;; QualEnv SigComp -> SigComp
+;; prefix all types & modules in 'comp' with prefixes in 'qenv'
+(define (qualify-component qenv comp)
   (match comp
-    [(val-decl ty)        (val-decl (qualify-type M ty))]
-    [(type-alias-decl ty) (type-alias-decl (qualify-type M ty))]
+    [(val-decl ty)        (val-decl (qualify-type qenv ty))]
+    [(type-alias-decl ty) (type-alias-decl (qualify-type qenv ty))]
+    [(mod-decl sig)       (mod-decl (qualify-sig qenv sig))]
     [(type-opaque-decl)   (type-opaque-decl)]))
 
-; ModPath Type -> SigComp
-(define (qualify-type M type)
-  (define (qual τ) (qualify-type M τ))
+;; QualEnv Type -> Type
+(define (qualify-type qenv type)
+  (define (qual τ) (qualify-type qenv τ))
   (match type
-    [(named-reference x) (dot M x)]
-    [(dot M x) (error 'qualify-type "TODO: qualifying a dot type?")]
+    [(named-reference x)
+     (match (hash-ref qenv x #f)
+       [#f type]
+       [prefix (dot prefix x)])]
+    [(dot path x)
+     ;; TODO: how to qualify module paths?
+     ;;  probably should use path->base+names to split
+     ;;  path and qualify the base part
+     (error 'qualify-type "TODO: qualifying a dot type?")]
     [(Arrow ins out) (Arrow (map qual ins) (qual out))]
     [_
      ;; TODO: how do we know if the type contains more

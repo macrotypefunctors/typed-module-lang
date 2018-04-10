@@ -35,15 +35,23 @@
 ;;  - (type-opaque-decl)
 ;;  - (val-decl Type)
 ;; TODO: newtype-decl
+;;  - (mod-decl Signature)
 
 ; type-alias-decl from "type.rkt"
 (struct type-opaque-decl [] #:prefab)
 (struct val-decl [type] #:prefab)
+(struct mod-decl [type] #:prefab)
 
 ;; ---------------------------------------------------------
 
 ;; A ModExpr is one of:
+;;  - ModPath
+;;  - (mod ...)
+;;  ... TODO: other things
+
+;; A ModPath is one of:
 ;;  - Id
+;;  - (dot ModPath Symbol)
 
 ;; ---------------------------------------------------------
 
@@ -53,7 +61,7 @@
 ;;  - BaseType
 ;;  - (Arrow [Listof Type] Type)
 ;;  - (named-reference Symbol)
-;;  - (dot ModExpr Symbol)   <- added by module system
+;;  - (dot ModPath Symbol)   <- added by module system
 
 (struct dot [mod type-name] #:prefab)
 
@@ -241,16 +249,75 @@
 
 ;; -----------------------------------------------------
 
-(provide mod-expr-lookup
-         qualify-type)
+(provide qualify-type)
 
-;; Env ModExpr Symbol -> SigComp or #f
-(define (mod-expr-lookup env M x)
+N : (sig (type C))
+
+M = (mod
+     (type A)
+     (define-module L :
+       (sig
+        (type B)
+        (type T1 = A)
+        (type T2 = B)
+        (type T3 = N.C))))
+
+M.L : (sig (type B)
+           (type T1 = M.A)
+           (type T2 = B))
+
+M.L.T1 = (alias M.A)
+M.L.T2 = (alias M.L.B)
+M.L.T3 = (alias N.C)
+
+;; Path -> Id [Listof Sym]
+(define (path->base+names path)
+  (match path
+    [(? identifier? id)
+     (values id '())]
+    [(dot path* x)
+     (define-values [base xs]
+       (path->base+names path*))
+     (values base (append xs (list x)))]))
+
+;; Env ModPath Symbol -> SigComp or #f
+;; returns corresponding component whose types are
+;; valid in the scope of 'env'.
+(define (mod-path-lookup env path y)
+  (define-values [base xs]
+    (path->base+names path))
+
+  (define sig
+    (env-lookup-module env base))
+
+  (let loop ([sig sig]
+             [xs xs])
+    (and
+     (sig? sig)
+     (match xs
+       ['() (sig-ref sig y #f)]
+       [(cons x xs*)
+        (match (sig-ref sig x #f)
+          [(mod-decl sig*)
+           (qualify-??? (loop
+
+
+  (match path
+    [(dot M sub)
+
+     (define env*
+
+     (match (mod-path-lookup env M sub)
+       [(mod-decl S)
+        (define comp (and (sig? S) (sig-ref sig x #f)))
+        (and comp (qualify-component
+
   ;; TODO: handle cases other than ModExpr is an Id
   (unless (identifier? M) (error 'TODO))
   (define sig (env-lookup-module env M))
   (define comp (and sig (hash-ref sig x #f)))
   (and comp (qualify-component M comp)))
+
 
 ;; ModExpr SigComp -> SigComp
 ;; prefix all named types in the component with module 'M'
@@ -260,7 +327,7 @@
     [(type-alias-decl ty) (type-alias-decl (qualify-type M ty))]
     [(type-opaque-decl)   (type-opaque-decl)]))
 
-; ModExpr Type -> SigComp
+; ModPath Type -> SigComp
 (define (qualify-type M type)
   (define (qual τ) (qualify-type M τ))
   (match type

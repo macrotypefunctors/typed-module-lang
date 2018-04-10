@@ -43,7 +43,7 @@ Defines a type with a single unary constructor @racket[_constructor-id].
 @subsection{Runtime Expressions}
 
 These forms are for expressions that evaluate to values at runtime.
-@overloaded-listing[e #%var #%dot λ #%app]
+@overloaded-listing[e #%var λ #%app #%dot]
 
 @defform[(#%datum . n)
          #:contracts ([n exact-integer?])]{
@@ -140,13 +140,6 @@ input and output signatures. @racket[_id] is bound within @racket[_out-sig-expr]
    @spec[s (#%var id)]{A reference to a signature.})
 
 @;---------------------------------------------------------------------------------
-@; #%dot
-
-@(defidform/overloaded #%dot
-   @spec[e (#%dot mod-expr id)]{References a value binding in the module @racket[_mod-expr].}
-   @spec[τ (#%dot mod-expr id)]{References a type binding in the module @racket[_mod-expr].})
-
-@;---------------------------------------------------------------------------------
 @; λ
 
 @(defidform/overloaded λ
@@ -165,6 +158,9 @@ input and output signatures. @racket[_id] is bound within @racket[_out-sig-expr]
    with signature @racket[_sig-expr]. Can be instantiated with @ref[#%app m].
    Functors may be curried. })
 
+@;---------------------------------------------------------------------------------
+@; #%app
+
 @(defidform/overloaded #%app
    #:literals [:]
 
@@ -175,3 +171,10 @@ input and output signatures. @racket[_id] is bound within @racket[_out-sig-expr]
    Instantiates the functor module @racket[_functor-expr] with @racket[_mod-expr].
    @;TODO: talk about drawbacks when comparing two paths
    })
+
+@;---------------------------------------------------------------------------------
+@; #%dot
+
+@(defidform/overloaded #%dot
+   @spec[e (#%dot mod-expr id)]{References a value binding in the module @racket[_mod-expr].}
+   @spec[τ (#%dot mod-expr id)]{References a type binding in the module @racket[_mod-expr].})

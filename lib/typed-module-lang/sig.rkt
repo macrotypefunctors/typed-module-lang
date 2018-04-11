@@ -368,7 +368,7 @@ M.L.T4 = (alias M.J.D)
    type
    (λ (x)
      (match (hash-ref qenv x #f)
-       [#f type]
+       [#f (named-reference x)]
        [prefix (dot prefix x)]))))
 
 (define (qualify-sig qenv sig)

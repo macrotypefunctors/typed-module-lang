@@ -200,7 +200,9 @@
    #:fail-unless (signature-matches? external-G s-actual s-expected)
    ;; TODO: smaller error messages that say something like
    ;;       "this component is missing" or "this component has the wrong type"
-   "signature mismatch"
+   (format "signature mismatch:\n  expected: ~v\n  given:    ~v\n"
+           s-expected
+           s-actual)
    (er ⊢≫sig⇒
        ≫ #'m-
        sig⇒ s-expected)])

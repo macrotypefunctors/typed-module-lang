@@ -234,7 +234,7 @@
     ;; check if "M = N". according to ATAPL this is undecidable in
     ;; general, and there are very confusing circumstances that can
     ;; arise when we try to seal M or N. thus it is easier when M and
-    ;; N are only allowed to be identifiers (or paths).
+    ;; N are only allowed to be *paths*.
 
     [[(dot M x) (dot N x)]
      #:when (mod-path-equal? M N)

@@ -99,7 +99,7 @@
 
           [(mod-binding sig)
            ;; TODO: resolve-ids somewhere in a submodule sig?
-           (mod-binding sig)]))
+           (mod-decl sig)]))
       ;; convert identifiers into symbols for the signature
       (values (syntax-e id) decl))))
 
@@ -156,7 +156,7 @@
    (define comp (sig-ref s (syntax-e #'x)))
    (unless (or (type-alias-decl? comp) (type-opaque-decl? comp))
      (raise-syntax-error #f "not a type binding" #'x))
-   (type-stx (dot (named-reference #'m) (syntax-e #'x)))]
+   (type-stx (dot (attribute m.path) (syntax-e #'x)))]
 
   ;; as a module expression
   [⊢≫sig⇒

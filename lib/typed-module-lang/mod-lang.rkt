@@ -144,7 +144,7 @@
    (define comp (sig-ref s (syntax-e #'x)))
    (unless (or (type-alias-decl? comp) (type-opaque-decl? comp))
      (raise-syntax-error #f "not a type binding" #'x))
-   (type-stx (dot #'m (syntax-e #'x)))]
+   (type-stx (dot (named-reference #'m) (syntax-e #'x)))]
   )
 
 ;; --------------------------------------------------------------
@@ -216,9 +216,12 @@
 
    (define dke (map (λ (x) (list x 'type))
                     (append (@ alias-name) (@ opaque-name))))
+   (define dke+external
+     ;; the things in the dke are "closer"
+     (append dke (env->decl-kind-env external-G)))
 
    (define (expand-type type-stx)
-     (expand-type/dke dke type-stx))
+     (expand-type/dke dke+external type-stx))
 
    (define val-τs (map expand-type (@ val-type)))
    (define alias-τs (map expand-type (@ alias-type)))

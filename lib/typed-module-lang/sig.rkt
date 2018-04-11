@@ -364,22 +364,12 @@ M.L.T4 = (alias M.J.D)
 
 ;; QualEnv Type -> Type
 (define (qualify-type qenv type)
-  (define (qual τ) (qualify-type qenv τ))
-  (match type
-    [(named-reference x)
+  (transform-named-reference
+   type
+   (λ (x)
      (match (hash-ref qenv x #f)
        [#f type]
-       [prefix (dot prefix x)])]
-    [(dot path x)
-     ;; TODO: how to qualify module paths?
-     ;;  probably should use path->base+names to split
-     ;;  path and qualify the base part
-     (error 'qualify-type "TODO: qualifying a dot type?")]
-    [(Arrow ins out) (Arrow (map qual ins) (qual out))]
-    [_
-     ;; TODO: how do we know if the type contains more
-     ;;  references?
-     type]))
+       [prefix (dot prefix x)]))))
 
 (define (qualify-sig qenv sig)
   ;; TODO: avoid captures?

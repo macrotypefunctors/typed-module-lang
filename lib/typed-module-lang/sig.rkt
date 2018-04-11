@@ -50,7 +50,7 @@
 ;;  ... TODO: other things
 
 ;; A ModPath is one of:
-;;  - Id
+;;  - (named-reference Id)
 ;;  - (dot ModPath Symbol)
 
 ;; ---------------------------------------------------------
@@ -64,6 +64,20 @@
 ;;  - (dot ModPath Symbol)   <- added by module system
 
 (struct dot [mod type-name] #:prefab)
+
+;; f might take a symbol and turn it into a type,
+;; or might take a symbol and turn it into a path?
+(define (transform-named-reference τ f)
+  (define (tnr-f t)
+    (transform-named-reference t f))
+  (match τ
+    [(dot M x)
+     (dot (tnr-f M) x)]
+    [_
+     (type-transform-named-reference/recur τ f transform-named-reference)]))
+
+(define (named-reference-map f τ)
+  (transform-named-reference τ (compose named-reference f)))
 
 ;; ---------------------------------------------------------
 
@@ -162,7 +176,7 @@
   (define (sig-sym->id sym)
     (datum->syntax #f sym))
   (define (type-map-sym->id t)
-    (type-named-reference-map sig-sym->id t))
+    (named-reference-map sig-sym->id t))
   (define (sig-component-map-sym->id comp)
     (match comp
       [(type-alias-decl t) (type-alias-decl (type-map-sym->id t))]
@@ -244,8 +258,11 @@
 
 ;; ModPath ModPath -> Bool
 (define (mod-path-equal? M N)
-  ;; TODO: handle cases other than ModPath is an Id
-  (free-identifier=? M N))
+  (define-values [M-base M-syms] (path->base+names M))
+  (define-values [N-base N-syms] (path->base+names N))
+  (and
+   (free-identifier=? M-base N-base)
+   (equal? M-syms N-syms)))
 
 ;; -----------------------------------------------------
 
@@ -284,7 +301,7 @@ M.L.T4 = (alias M.J.D)
 ;; Path -> Id [Listof Sym]
 (define (path->base+names path)
   (match path
-    [(? identifier? id)
+    [(named-reference id)
      (values id '())]
     [(dot path* x)
      (define-values [base xs]
@@ -317,15 +334,17 @@ M.L.T4 = (alias M.J.D)
 
   (let loop ([sig sig]
              [xs xs]
-             [qenv '()]
-             [prefix base])
+             ; qenv : QualEnv = [Hashof Symbol Path]
+             [qenv (hash)]
+             ; prefix : ModPath
+             [prefix (named-reference base)])
     (and
      (sig? sig)
      (let ([qenv* (extend-qual-env qenv sig prefix)])
        (match xs
          ['()
           (define comp (sig-ref sig y #f))
-          (and comp (qualify-component qenv comp))]
+          (and comp (qualify-component qenv* comp))]
 
          [(cons x xs*)
           (match (sig-ref sig x #f)
@@ -445,23 +464,23 @@ M.L.T4 = (alias M.J.D)
     (check-sig-matches J* J)
 
     (check-sig-matches
-     (pi-sig x I (sig 'v (val-decl (dot x 't))))
-     (pi-sig x I* (sig 'v (val-decl (dot x 't)))))
+     (pi-sig x I (sig 'v (val-decl (dot (named-reference x) 't))))
+     (pi-sig x I* (sig 'v (val-decl (dot (named-reference x) 't)))))
 
     (check-sig-matches
-     (pi-sig x I (sig 'v (val-decl (dot x 't))))
+     (pi-sig x I (sig 'v (val-decl (dot (named-reference x) 't))))
      (pi-sig x I* (sig 'v (val-decl (Int)))))
 
     (check-sig-matches
-     (pi-sig x J (sig 'v (val-decl (dot x 't))))
-     (pi-sig x J* (sig 'v (val-decl (dot x 't)))))
+     (pi-sig x J (sig 'v (val-decl (dot (named-reference x) 't))))
+     (pi-sig x J* (sig 'v (val-decl (dot (named-reference x) 't)))))
 
     (check-sig-matches
-     (pi-sig x J (sig 'v (val-decl (dot x 't))))
-     (pi-sig x J* (sig 'v (val-decl (dot x 's)))))
+     (pi-sig x J (sig 'v (val-decl (dot (named-reference x) 't))))
+     (pi-sig x J* (sig 'v (val-decl (dot (named-reference x) 's)))))
 
     (check-not-sig-matches
-     (pi-sig x J (sig 'v (val-decl (dot x 't))))
+     (pi-sig x J (sig 'v (val-decl (dot (named-reference x) 't))))
      (pi-sig x J* (sig 'v (val-decl (Int)))))
     )
   )

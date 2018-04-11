@@ -115,17 +115,30 @@
 
 ;; ---------------------------------------------------------
 
-;; type-named-reference-map :
-;; [X -> Y] [TypeWNamedRef X] -> [TypeWNamedRef Y]
+;; type-named-reference-map : [X -> Y] [TypeWNamedRef X] -> [TypeWNamedRef Y]
 (define (type-named-reference-map f τ)
-  (define (tnrmap-f t)
-    (type-named-reference-map f t))
+  (type-transform-named-reference τ (compose named-reference f)))
+
+;; type-transform-named-reference :
+;; [TypeWNamedRef X]
+;; [X -> [TypeWNamedRef Y]]
+;; ->
+;; [TypeWNamedRef Y]
+
+;; (type-transform-named-reference τ named-reference) = τ
+
+(define (type-transform-named-reference τ f)
+  (type-transform-named-reference/recur τ f type-transform-named-reference))
+
+(define (type-transform-named-reference/recur τ f recur-ttnr)
+  (define (ttnr-f t)
+    (recur-ttnr t f))
   (match τ
     [(named-reference x)
-     (named-reference (f x))]
+     (f x)]
     [(Arrow ins out)
-     (Arrow (map tnrmap-f ins)
-            (type-named-reference-map f out))]
+     (Arrow (map ttnr-f ins)
+            (ttnr-f out))]
     ;; TODO: how do we know whether τ contains a
     ;; named-reference or not?
     [_ τ]))

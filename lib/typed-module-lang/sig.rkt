@@ -223,16 +223,16 @@
     ;; N are only allowed to be identifiers (or paths).
 
     [[(dot M x) (dot N x)]
-     #:when (mod-expr-equal? M N)
+     #:when (mod-path-equal? M N)
      #t]
     [[(dot M x) _]
      (=> cont)
-     (match (mod-expr-lookup env M x)
+     (match (mod-path-lookup env M x)
        [(type-alias-decl A*) (type-matches? env A* B)]
        [_ (cont)])]
     [[_ (dot N y)]
      (=> cont)
-     (match (mod-expr-lookup env N y)
+     (match (mod-path-lookup env N y)
        [(type-alias-decl B*) (type-matches? env A B*)]
        [_ (cont)])]
 
@@ -242,14 +242,17 @@
      ;;       instead of ours?
      (subtype?/recur env A B type-matches?)]))
 
-;; ModExpr ModExpr -> Bool
-(define (mod-expr-equal? M N)
-  ;; TODO: handle cases other than ModExpr is an Id
+;; ModPath ModPath -> Bool
+(define (mod-path-equal? M N)
+  ;; TODO: handle cases other than ModPath is an Id
   (free-identifier=? M N))
 
 ;; -----------------------------------------------------
 
 (provide qualify-type)
+
+#|
+Interesting Examples:
 
 N : (sig (type C))
 
@@ -276,6 +279,7 @@ M.L.T1 = (alias M.A)
 M.L.T2 = (alias M.L.B)
 M.L.T3 = (alias N.C)
 M.L.T4 = (alias M.J.D)
+|#
 
 ;; Path -> Id [Listof Sym]
 (define (path->base+names path)

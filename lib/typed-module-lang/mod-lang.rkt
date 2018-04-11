@@ -143,7 +143,9 @@
    (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
    (define τ_x
      (match (sig-ref s (syntax-e #'x))
-       [(val-decl τ) (qualify-type #'m τ)]
+       [(val-decl τ)
+        (define qenv (extend-qual-env (hash) s (attribute m.path)))
+        (qualify-type qenv τ)]
        [_ (raise-syntax-error #f "not a value binding" #'x)]))
    (er ⊢≫⇒ ≫ #'(hash-ref m- 'x) ⇒ τ_x)]
 

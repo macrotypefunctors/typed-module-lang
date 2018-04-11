@@ -270,7 +270,8 @@
 ;; -----------------------------------------------------
 
 (provide qualify-type
-         qualify-sig)
+         qualify-sig
+         extend-qual-env)
 
 #|
 Interesting Examples:
@@ -315,23 +316,23 @@ M.L.T4 = (alias M.J.D)
 
 ;; a QualEnv is a [Hashof Symbol ModPath]
 
+;; QualEnv Sig ModPath -> QualEnv
+(define (extend-qual-env qenv sig prefix)
+  (for/fold ([qenv qenv])
+            ([(x comp) (in-hash sig)])
+    (match comp
+      [(or (type-alias-decl _)
+           (type-opaque-decl)
+           (mod-decl _))
+       (hash-set qenv x prefix)]
+      [_ qenv])))
+
 ;; Env ModPath Symbol -> SigComp or #f
 ;; returns corresponding component whose types are
 ;; valid in the scope of 'env'.
 (define (mod-path-lookup env path y)
   (define-values [base xs]
     (path->base+names path))
-
-  ;; QualEnv Sig ModPath -> QualEnv
-  (define (extend-qual-env qenv sig prefix)
-    (for/fold ([qenv qenv])
-              ([(x comp) (in-hash sig)])
-      (match comp
-        [(or (type-alias-decl _)
-             (type-opaque-decl)
-             (mod-decl _))
-         (hash-set qenv x prefix)]
-        [_ qenv])))
 
   (define sig
     (env-lookup-module env base))

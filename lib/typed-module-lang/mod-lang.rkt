@@ -80,7 +80,7 @@
       (map list type-ids (map syntax-e type-ids)))
 
     (define (resolve-ids τ)
-      (type-named-reference-map
+      (named-reference-map
        (λ (x)
          (match (assoc x type-id-syms free-identifier=?)
            [#f x]
@@ -95,7 +95,11 @@
           [(type-binding decl)
            (match decl
              [(type-alias-decl τ) (type-alias-decl (resolve-ids τ))]
-             [(type-opaque-decl) decl])]))
+             [(type-opaque-decl) decl])]
+
+          [(mod-binding sig)
+           ;; TODO: resolve-ids somewhere in a submodule sig?
+           (mod-binding sig)]))
       ;; convert identifiers into symbols for the signature
       (values (syntax-e id) decl))))
 
@@ -123,10 +127,18 @@
 
 ;; --------------------------------------------------------------
 
+(begin-for-syntax
+  (define-syntax-class module-path
+    #:attributes (path)
+    (pattern ((~literal #%dot) M:module-path x:id)
+             #:attr path (dot (attribute M.path) (syntax-e #'x)))
+    (pattern x:id
+             #:attr path (named-reference #'x))))
+
 (define-typed-syntax #%dot
   ;; as an expression
   [⊢≫⇒
-   [G ⊢ #'(_ m:id x:id)]
+   [G ⊢ #'(_ m:module-path x:id)]
    (ec G ⊢ #'m ≫ #'m- sig⇒ s)
    (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
    (define τ_x
@@ -137,7 +149,7 @@
 
   ;; as a type
   [⊢≫type⇐
-   [dke ⊢ #'(_ m:id x:id)]
+   [dke ⊢ #'(_ m:module-path x:id)]
    (define G (filter (compose mod-binding? second) dke))
    (ec G ⊢ #'m ≫ _ sig⇒ s)
    (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
@@ -145,17 +157,53 @@
    (unless (or (type-alias-decl? comp) (type-opaque-decl? comp))
      (raise-syntax-error #f "not a type binding" #'x))
    (type-stx (dot (named-reference #'m) (syntax-e #'x)))]
-  )
+
+  ;; as a module expression
+  [⊢≫sig⇒
+   [G ⊢ #'(_ m:module-path x:id)]
+   (ec G ⊢ #'m ≫ #'m- sig⇒ s)
+   (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
+   (define s_x
+     (match (sig-ref s (syntax-e #'x))
+       [(mod-decl m-sig)
+        ;; TODO: qualify something?
+        m-sig]
+       [_ (raise-syntax-error #f "not a submodule" #'x)]))
+
+   (er ⊢≫sig⇒ ≫ #'(hash-ref m- 'x)
+       sig⇒ s_x)])
+
 
 ;; --------------------------------------------------------------
 
 (define-typed-syntax define-module
   #:datum-literals [=]
+  ;; used in toplevel
   [⊢≫modsigdef⇒
    [external-G ⊢ #'(_ name:id = m:expr)]
    (ec external-G ⊢ #'m ≫ #'m- sig⇒ s)
    (er ⊢≫modsigdef⇒ ≫ #`(define name m-)
-       modsigdef⇒ (list (list #'name (mod-binding s))))])
+       modsigdef⇒ (list (list #'name (mod-binding s))))]
+
+  ;; pass 1 of core-lang-tc-passes
+  [⊢≫decl-kinds⇒ [⊢ stx] (er ⊢≫decl-kinds⇒ ≫ stx decl-kinds⇒ '())]
+  ;; pass 2 of core-lang-tc-passes
+  [⊢≫decl⇒
+   [dke ⊢ #'(_ name:id = m:expr)]
+   (define toplevel-G
+     (for/list ([entry (in-list dke)]
+                #:when (mod-binding? (second entry)))
+       entry))
+   (ec toplevel-G ⊢ #'m ≫ #'m- sig⇒ s)
+   (er ⊢≫decl⇒
+       ≫ #'(define-module/pass3 name = m-)
+       decl⇒ (list (list #'name (mod-binding s))))])
+
+(define-typed-syntax define-module/pass3
+  ;; pass 3 of core-lang-tc-passes
+  [⊢≫val-def⇐
+   [_ ⊢ #'(define-module/pass3 name = m-)]
+   (er ⊢≫val-def⇐ ≫ #'(define name m-))])
 
 (define-typed-syntax define-signature
   #:datum-literals [=]

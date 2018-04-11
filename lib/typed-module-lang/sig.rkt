@@ -25,7 +25,8 @@
 ;; ---------------------------------------------------------
 
 (provide type-opaque-decl type-opaque-decl?
-         val-decl val-decl?)
+         val-decl val-decl?
+         mod-decl mod-decl?)
 
 ;; A Sig is represented with a
 ;;   (Hashof Symbol SigComponent)
@@ -55,7 +56,9 @@
 
 ;; ---------------------------------------------------------
 
-(provide dot dot?)
+(provide dot dot?
+         transform-named-reference
+         named-reference-map)
 
 ;; A Type is one of:
 ;;  - BaseType
@@ -266,7 +269,8 @@
 
 ;; -----------------------------------------------------
 
-(provide qualify-type)
+(provide qualify-type
+         qualify-sig)
 
 #|
 Interesting Examples:

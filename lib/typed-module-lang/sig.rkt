@@ -13,7 +13,7 @@
 ;;  - PiSig
 
 (define sig (procedure-rename hash 'sig))
-(define sig-ref (procedure-rename hash-ref 'sig-ref))
+(define (sig-ref s x) (hash-ref s x #f))
 (define (sig? s) (and (hash? s) (immutable? s)))
 
 ;; A PiSig is represented with a
@@ -378,11 +378,11 @@ M.L.T4 = (alias M.J.D)
      (let ([qenv* (extend-qual-env qenv sig prefix)])
        (match xs
          ['()
-          (define comp (sig-ref sig y #f))
+          (define comp (sig-ref sig y))
           (and comp (qualify-component qenv* comp))]
 
          [(cons x xs*)
-          (match (sig-ref sig x #f)
+          (match (sig-ref sig x)
             [(mod-decl sig*)
              (define path* (dot path x))
              (loop sig* xs* qenv* path*)]

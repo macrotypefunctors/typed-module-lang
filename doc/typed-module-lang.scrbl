@@ -1,6 +1,6 @@
 #lang scribble/manual
 
-@(require (for-label typed-module-lang
+@(require (for-label (except-in typed-module-lang =)
                      (except-in racket/contract/base ->))
           (for-syntax racket/base syntax/parse)
           racket/list
@@ -39,10 +39,9 @@ with @racket[_rhs-type].
 }
 
 @defform[#:literals [=]
-         (newtype id = (constructor-id type))]{
-Defines a type with a single unary constructor @racket[_constructor-id].
-
-@racketblock[(newtype Bool = (bool (∀ (X) (-> X X X))))]
+         (check actual-expr = expected-expr)]{
+Performs a test that the two expressions yield the same value. Internally
+uses rackunit's @racket[check-equal?].
 }
 
 @;---------------------------------------------------------------------------------
@@ -52,8 +51,8 @@ These forms are for expressions that evaluate to values at runtime.
 @overloaded-listing[e #%var λ #%app #%dot]
 
 @defform[(#%datum . n)
-         #:contracts ([n exact-integer?])]{
-Interposition point for literals. Only integer literals are currently supported.
+         #:contracts ([n (or/c exact-integer? boolean?)])]{
+Interposition point for literals. Supports exact integers and booleans.
 }
 
 @defform[(let ([id expr] ...) body-expr)]{
@@ -63,10 +62,24 @@ Locally binds @racket[_id]s within @racket[_body-expr].
 @defform[(inst {type ...} expr)]{
 Instantiation of quantified types. UNIMPLEMENTED. }
 
+@defform[(if question-expr then-expr else-expr)]{
+Evaluates @racket[_then-expr] if @racket[_question-expr] evaluates
+to @racket[#t], otherwise evaluates @racket[_else-expr].
+
+@racketblock[
+(val not : (-> Bool Bool)
+  (λ (x) (if x #f #t)))]
+}
+
 @deftogether[
  [@defthing[+ (-> Int Int Int)]
   @defthing[- (-> Int Int Int)]
-  @defthing[* (-> Int Int Int)]]]{
+  @defthing[* (-> Int Int Int)]
+  @defthing[quo (-> Int Int Int)]
+  @defthing[rem (-> Int Int Int)]
+  @defthing[< (-> Int Int Bool)]
+  @defthing[> (-> Int Int Bool)]
+  @defthing[= (-> Int Int Bool)]]]{
 Primitive operations on integers.
 }
 
@@ -77,6 +90,7 @@ These forms are for type expressions.
 @overloaded-listing[τ #%var #%dot]
 
 @defidform[Int]{The type of exact integers.}
+@defidform[Bool]{The type of booleans (@racket[#t] or @racket[#f]).}
 
 @defform[(-> in-type ... out-type)]{
 The type of functions from @racket[in-type]s to @racket[out-type].}
@@ -90,7 +104,8 @@ Quantified types. UNIMPLEMENTED. }
 
 @defform[#:literals [=]
          (define-module id = mod-expr)]{
-Creates a module binding.
+Creates a module binding. The @racket[_mod-expr] is immediately
+instantiated if it is not a functor.
 }
 
 @defform[#:literals [=]
@@ -102,7 +117,7 @@ with @racket[_sig-expr].}
 @subsection{Module Expressions}
 
 These forms are for module expressions.
-@overloaded-listing[m #%var λ #%app]
+@overloaded-listing[m #%var λ #%app #%dot]
 
 @defform[(mod def ...)]{
 Creates a module structure consisting of the given definitions.
@@ -114,7 +129,31 @@ Creates a module structure consisting of the given definitions.
     (type Image = (-> Int Int Color))
     (val black : Color = 0)
     (val white : Color = 100)
-    (val blank : Image = (λ (x y) white))))]}
+    (val blank : Image = (λ (x y) white))))]
+
+Module structures are allowed to contain @racket[check]s, which are
+run when the module is instantiated.
+
+@racketblock[
+(define-module Tests =
+  (mod
+    (check (Image.blank 0 0) = Image.white)))]
+
+Module structures may contain submodules, using nested @racket[define-module]s:
+
+@racketblock[
+(define-module Painting =
+  (mod
+    (define-module Brush =
+      (mod (type T = (-> Int Int))
+           (val get-size : (-> T Int) (λ (br) (br 0)))
+           (val get-color : (-> T Image.Color) (λ (br) (br 1)))))
+    (val default-brush : Brush.T =
+      (λ (i) (if (= i 0) 1 Color.black)))))]
+
+Submodules are experimental and sometimes act in unexpected ways. For instance,
+all submodule definitions are moved to the front of a module, and may only
+access submodules above them. }
 
 @defform[#:literals [:>] (seal mod-expr :> sig-expr)]{
 Seals the module @racket[_mod-expr] to be constrained by
@@ -130,7 +169,9 @@ the signature @racket[_sig-expr].
   (seal (mod (type T = Int)
              (val inc : (-> T T) (λ (x) (+ x 1)))
              (val dec : (-> T T) (λ (x) (- x 1))))
-        <: COUNT))]}
+        :> COUNT))
+
+(val n : Int = (Count.inc 0)) (code:comment @#,elem{Does not typecheck, since T is opaque})]}
 
 @;---------------------------------------------------------------------------------
 @subsection{Signature Expressions}
@@ -194,9 +235,10 @@ input and output signatures. @racket[_id] is bound within @racket[_out-sig-expr]
    @spec[e (#%app func-expr arg-expr ...)]{
    Applies the @racket[_arg-expr]s to the function @racket[_func-expr].}
 
-   @spec[m (#%app functor-expr mod-expr)]{
-   Instantiates the functor module @racket[_functor-expr] with @racket[_mod-expr].
-   @;TODO: talk about drawbacks when comparing two paths
+   @spec[m (#%app functor-expr mod-path)]{
+   Instantiates the functor module @racket[_functor-expr] with @racket[_mod-path].
+   Note that the argument must be a path (a series of @ref[#%dot m] or @ref[#%var m]s);
+   arbitrary modules are not supported.
    })
 
 @;---------------------------------------------------------------------------------
@@ -204,4 +246,5 @@ input and output signatures. @racket[_id] is bound within @racket[_out-sig-expr]
 
 @(defidform/overloaded #%dot
    @spec[e (#%dot mod-expr id)]{References a value binding in the module @racket[_mod-expr].}
-   @spec[τ (#%dot mod-expr id)]{References a type binding in the module @racket[_mod-expr].})
+   @spec[τ (#%dot mod-expr id)]{References a type binding in the module @racket[_mod-expr].}
+   @spec[m (#%dot mod-path id)]{References a submodule in the module @racket[_mod-expr].})

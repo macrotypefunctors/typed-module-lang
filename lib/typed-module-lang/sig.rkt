@@ -134,6 +134,22 @@
 
 ;; ---------------------------------------------------------
 
+;; Creating `where` signatures
+
+(provide sig-where)
+
+(define (sig-where base sym type)
+  (hash-update base
+               sym
+    (λ (prev-decl)
+      (match prev-decl
+        [(type-opaque-decl) (type-alias-decl type)]
+        [_ (error "can't `where` a non-opaque declaration")]))
+    (λ ()
+      (error "can't `where` a non-existent declaration"))))
+
+;; ---------------------------------------------------------
+
 (provide signature-matches?
          type-matches?
          signature-subst)

@@ -345,11 +345,14 @@
   #:datum-literals [=]
   ;; as a signature (only use)
   [⊢≫signature⇐
-   [G ⊢ #'(_ base-sig:id type-id:id = type-stx:expr)]
+   [G ⊢ #'(_ base-sig:id type-id:id = τ-stx:expr)]
    (define base (expand-signature G #'base-sig))
    (define sym (syntax-e #'type-id))
-   (define type (expand-type/dke (env->decl-kind-env G) #'type-stx))
-   ('...)])
+   (define τ (expand-type/dke (env->decl-kind-env G) #'τ-stx))
+   ;; TODO: how to preserve the scope that the `τ` should be in?
+   ;;       (avoid capturing definitions from the base sig)
+   (type-stx
+    (sig-where base sym τ))])
 
 ;; --------------------------------------------------------------
 

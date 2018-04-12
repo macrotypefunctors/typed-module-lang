@@ -36,13 +36,13 @@
 
 (define-signature NAT =
   (Π ([B : BOOL-REP] [N : NAT-REP])
-    (let ([N (N B)])
-      (sig
-       ;; equality
-       (val = : (-> N.Nat N.Nat B.Bool))
-
-       ;; arithmetic
-       (val + : (-> N.Nat N.Nat N.Nat))))))
+    (sig
+     (define-module N = (N B))
+     ;; equality
+     (val = : (-> N.Nat N.Nat B.Bool))
+     
+     ;; arithmetic
+     (val + : (-> N.Nat N.Nat N.Nat)))))
 
 (define-module Bool-Rep =
   (seal
@@ -57,20 +57,20 @@
 (define-module Nat =
   (seal
    (λ ([B : BOOL-REP] [N : NAT-REP])
-     (let ([N (N B)])
-       (mod
-        ;; comparison
-        (val = = (λ ([a : N.Nat] [b : N.Nat])
-                   (B.if (N.z? a)
-                         (λ () (N.z? b))
-                         (λ () (B.if (N.z? b)
-                                     (λ () B.false)
-                                     (λ () (= (N.sub1 a) (N.sub1 b))))))))
-        ;; arithmetic
-        (val + = (λ ([a : N.Nat] [b : N.Nat])
-                   (B.if (N.z? a)
-                         (λ () b)
-                         (λ () (N.add1 (+ (N.sub1 a) b)))))))))
+     (mod
+      (define-module N = (N B))
+      ;; comparison
+      (val = = (λ ([a : N.Nat] [b : N.Nat])
+                 (B.if (N.z? a)
+                       (λ () (N.z? b))
+                       (λ () (B.if (N.z? b)
+                                   (λ () B.false)
+                                   (λ () (= (N.sub1 a) (N.sub1 b))))))))
+      ;; arithmetic
+      (val + = (λ ([a : N.Nat] [b : N.Nat])
+                 (B.if (N.z? a)
+                       (λ () b)
+                       (λ () (N.add1 (+ (N.sub1 a) b))))))))
    :>
    NAT))
 

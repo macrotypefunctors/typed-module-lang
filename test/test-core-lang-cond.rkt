@@ -22,3 +22,10 @@
             1
             (* 3 (pair 0 (- y 1))))
         (* 2 (pair (- x 1) y)))))
+
+(val p1 : NatPair = (pair 5 2))
+(check p1 = 288) ; = 2^5 * 3^2
+
+(val p2 : NatPair = (pair 7 11))
+(check (fst p2) = 7)
+(check (snd p2) = 11)

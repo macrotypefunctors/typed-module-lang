@@ -6,6 +6,7 @@
          ; forms
          val
          type
+         check
          #%var
          (rename-out
           [core-lang-module-begin #%module-begin]
@@ -27,6 +28,7 @@
 
 (require syntax/parse/define
          macrotypes-nonstx/type-macros
+         rackunit
          (for-syntax racket/base
                      racket/list
                      racket/match
@@ -155,6 +157,19 @@
   [⊢≫val-def⇐
    [_ ⊢ stx]
    (er ⊢≫val-def⇐ ≫ #'(begin))])
+
+(define-typed-syntax check
+  #:datum-literals [=]
+  ;; pass 1
+  [⊢≫decl-kinds⇒ [⊢ stx] (er ⊢≫decl-kinds⇒ ≫ stx decl-kinds⇒ '())]
+  ;; pass 2
+  [⊢≫decl⇒ [dke ⊢ stx] (er ⊢≫decl⇒ ≫ stx decl⇒ '())]
+  ;; pass 3
+  [⊢≫val-def⇐
+   [G ⊢ #'(_ e1 = e2)]
+   (ec G ⊢ #'e1 ≫ #'e1- ⇒ τ)
+   (ec G ⊢ #'e2 ≫ #'e2- ⇐ τ)
+   (er ⊢≫val-def⇐ ≫ #'(check-equal? e1- e2-))])
 
 ;; ----------------------------------------------------
 

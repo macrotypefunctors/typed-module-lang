@@ -7,7 +7,8 @@
          (rename-out [mod-lang-module-begin #%module-begin]
                      [mod-lang-lambda lambda]
                      [mod-lang-lambda λ]
-                     [mod-lang-#%app #%app])
+                     [mod-lang-#%app #%app]
+                     [mod-lang-where where])
          define-module
          mod
          seal
@@ -337,3 +338,18 @@
   [else
    #:with (_ . rst) this-syntax
    (syntax/loc this-syntax (core-#%app . rst))])
+
+;; --------------------------------------------------------------
+
+(define-typed-syntax mod-lang-where
+  #:datum-literals [=]
+  ;; as a signature (only use)
+  [⊢≫signature⇐
+   [G ⊢ #'(_ base-sig:id type-id:id = type-stx:expr)]
+   (define base (expand-signature G #'base-sig))
+   (define sym (syntax-e #'type-id))
+   (define type (expand-type/dke (env->decl-kind-env G) #'type-stx))
+   ('...)])
+
+;; --------------------------------------------------------------
+

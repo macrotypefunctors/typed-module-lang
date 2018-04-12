@@ -15,14 +15,14 @@
    (define-module L =
      (seal (mod
             (type B = (-> (-> (-> Int))))
-            (type T1 = A)
+            ;(type T1 = A)
             (type T2 = B)
             (type T3 = N.C)
             (type T4 = J.D))
            :>
            (sig
             (type B)
-            (type T1 = A)
+            ;(type T1 = A)
             (type T2 = B)
             (type T3 = N.C)
             (type T4 = J.D))))))
@@ -37,7 +37,7 @@ B must have M.L.
   (seal M.L
         :>
         (sig (type B)
-             (type T1 = M.A)
+             ;(type T1 = M.A)
              (type T2 = B)
              (type T3 = N.C)
              (type T4 = M.J.D))))

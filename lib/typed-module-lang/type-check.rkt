@@ -13,7 +13,25 @@
          "sig.rkt")
 
 ;; -------------------------------------------------------------------
+
+;; Expanding module definitions as submodules within a larger module.
+
+;; pass 0 of mod-body-tc-passes
+(define-expand-check-relation sc/def/submod
+  [external-G module-def -> module-def- intro-env]
+  [external-G ⊢ module-def ≫ module-def- submoddef⇒ intro-env]
+  [external-G ⊢ module-def]
+  [≫ module-def- submoddef⇒ intro-env]
+  #:in-stx module-def
+  #:out-stx module-def-
+  #:stop-ids '()
+  #:bad-output
+  (raise-syntax-error #f "expected a typed module definition" module-def))
+
+;; -------------------------------------------------------------------
 ;; type checking within a mod
+
+;; pass 1 of mod-body-tc-passes and core-lang-tc-passes
 
 ;; which declarations exist? what kind of declarations are they?
 (define-expand-check-relation tc/decl-kinds
@@ -25,7 +43,11 @@
   #:in-stx decl
   #:out-stx decl-
   #:stop-ids '()
-  #:bad-output (raise-syntax-error #f "expected a type or val declaration" decl))
+  #:bad-output (raise-syntax-error #f "expected a type or val declaration" decl)
+  #:implicit-rule
+  [⊢≫submoddef⇒
+   [G ⊢ stx]
+   (er ⊢≫submoddef⇒ ≫ stx submoddef⇒ '())])
 
 ;; expand types within declarations to build the module's environment
 ;; TODO: when do we check for recursion in type aliases? what information do we need?
@@ -120,17 +142,6 @@
   #:bad-output
   (raise-syntax-error #f "expected a typed module expression" module-expr))
 
-(define-expand-check-relation sc/def
-  [external-G module-def -> module-def- intro-env]
-  [external-G ⊢ module-def ≫ module-def- modsigdef⇒ intro-env]
-  [external-G ⊢ module-def]
-  [≫ module-def- modsigdef⇒ intro-env]
-  #:in-stx module-def
-  #:out-stx module-def-
-  #:stop-ids '()
-  #:bad-output
-  (raise-syntax-error #f "expected a typed module definition" module-def))
-
 (define-expand-check-relation sc/sig
   [external-G signature-expr -> signature-expr-]
   [external-G ⊢ signature-expr ≫ signature-expr- signature⇐]
@@ -145,3 +156,58 @@
 (define (expand-signature G signature-stx)
   (match-define (type-stx s) (expand/sc/sig-in G signature-stx))
   s)
+
+;; -------------------------------------------------------------------
+
+;; Expanding Module and Signature Definitions at the *top level*.
+
+;; This is used by mod-lang's #%module-begin
+
+(define-expand-check-relation sc/def/top
+  [external-G module-def -> module-def- intro-env]
+  [external-G ⊢ module-def ≫ module-def- modsigdef⇒ intro-env]
+  [external-G ⊢ module-def]
+  [≫ module-def- modsigdef⇒ intro-env]
+  #:in-stx module-def
+  #:out-stx module-def-
+  #:stop-ids '()
+  #:bad-output
+  (raise-syntax-error #f "expected a typed module definition" module-def))
+
+;; -------------------------------------------------------------------
+
+;; Expanding module definitions either at the top level or as a
+;; submodule.
+
+(define-expand-check-relation sc/moddef
+  [external-G module-def -> module-def- intro-env]
+  [external-G ⊢ module-def ≫ module-def- moddef⇒ intro-env]
+  [external-G ⊢ module-def]
+  [≫ module-def- moddef⇒ intro-env]
+  #:in-stx module-def
+  #:out-stx module-def-
+  #:stop-ids '()
+  #:bad-output
+  (raise-syntax-error #f "expected a typed module definition" module-def)
+  #:implicit-rule
+  [⊢≫modsigdef⇒
+   [G ⊢ module-def]
+   (ec G ⊢ module-def ≫ module-def- moddef⇒ intro-env)
+   (er ⊢≫modsigdef⇒ ≫ module-def- modsigdef⇒ intro-env)]
+  #:implicit-rule
+  [⊢≫submoddef⇒
+   [G ⊢ module-def]
+   (ec G ⊢ module-def ≫ module-def- moddef⇒ intro-env)
+   (er ⊢≫submoddef⇒ ≫ module-def- submoddef⇒ intro-env)]
+  )
+
+;; implicit rules:
+;;
+;;   G ⊢ module-def ≫ module-def- moddef⇒ intro-env
+;;   --------------------------------------------------
+;;   G ⊢ module-def ≫ module-def- modsigdef⇒ intro-env
+;;
+;;   G ⊢ module-def ≫ module-def- moddef⇒ intro-env
+;;   --------------------------------------------------
+;;   G ⊢ module-def ≫ module-def- submoddef⇒ intro-env
+

@@ -41,6 +41,21 @@
 ;; A whole program for mod-lang follows this rule
 
 (begin-for-syntax
+  ;; mod-body-tc-passes :
+  ;; Env [Listof Stx] -> (values [Listof Stx] Env)
+  (define (mod-body-tc-passes external-G ds)
+    (define-values [module-bindings ds/0]
+      (for/list/acc ([G '()])
+                    ([d (in-list ds)])
+        (define G+external (append G external-G))
+        (ec G+external ⊢ d ≫ d- submoddef⇒ G+)
+        (values (append G+ G)
+                d-)))
+    (define G+modules (append module-bindings external-G))
+    (define-values [ds/1234 module-env]
+      (core-lang-tc-passes G+modules ds/0))
+    (values ds/1234 (append module-env module-bindings)))
+  
   ;; mod-lang-sc-passes :
   ;; [Listof Stx] -> (values [Listof Stx] Env)
   (define (mod-lang-sc-passes ds)
@@ -181,31 +196,22 @@
 (define-typed-syntax define-module
   #:datum-literals [=]
   ;; used in toplevel
-  [⊢≫modsigdef⇒
+  [⊢≫moddef⇒
    [external-G ⊢ #'(_ name:id = m:expr)]
    (ec external-G ⊢ #'m ≫ #'m- sig⇒ s)
-   (er ⊢≫modsigdef⇒ ≫ #`(define name m-)
-       modsigdef⇒ (list (list #'name (mod-binding s))))]
+   (er ⊢≫moddef⇒ ≫ #`(define-module/pass-1234 name m-)
+       moddef⇒ (list (list #'name (mod-binding s))))])
 
+(define-typed-syntax define-module/pass-1234
   ;; pass 1 of core-lang-tc-passes
   [⊢≫decl-kinds⇒ [⊢ stx] (er ⊢≫decl-kinds⇒ ≫ stx decl-kinds⇒ '())]
   ;; pass 2 of core-lang-tc-passes
-  [⊢≫decl⇒
-   [dke ⊢ #'(_ name:id = m:expr)]
-   (define toplevel-G
-     (for/list ([entry (in-list dke)]
-                #:when (mod-binding? (second entry)))
-       entry))
-   (ec toplevel-G ⊢ #'m ≫ #'m- sig⇒ s)
-   (er ⊢≫decl⇒
-       ≫ #'(define-module/pass3 name = m-)
-       decl⇒ (list (list #'name (mod-binding s))))])
-
-(define-typed-syntax define-module/pass3
-  ;; pass 3 of core-lang-tc-passes
+  [⊢≫decl⇒ [_ ⊢ stx] (er ⊢≫decl⇒ ≫ stx decl⇒ '())]
+  ;; pass 3 of cole-rang-tc-passes
   [⊢≫val-def⇐
-   [_ ⊢ #'(define-module/pass3 name = m-)]
+   [_ ⊢ #'(_ name m-)]
    (er ⊢≫val-def⇐ ≫ #'(define name m-))])
+
 
 (define-typed-syntax define-signature
   #:datum-literals [=]
@@ -228,7 +234,7 @@
    ;; include bindings from the external-G
    #:with name (generate-temporary 'mod)
    #:do [(define-values [ds- module-env]
-           (core-lang-tc-passes external-G (@ d)))
+           (mod-body-tc-passes external-G (@ d)))
          ;; TODO: include the type-env too
          ;; TODO: determine if the above comment is still relevant?
          (define module-sig (module-env->sig module-env))]

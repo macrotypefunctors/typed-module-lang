@@ -249,7 +249,8 @@
          ;; TODO: determine if the above comment is still relevant?
          (define module-sig (module-env->sig module-env))]
    #:with [x ...] (for/list ([entry (in-list module-env)]
-                             #:when (val-binding? (second entry)))
+                             #:when (or (val-binding? (second entry))
+                                        (mod-binding? (second entry))))
                     (first entry))
    #:with [[k/v ...] ...]
    #'[['x x] ...]

@@ -14,11 +14,16 @@
           [core-lang-lambda lambda]
           [core-lang-lambda λ]
           [core-lang-let let]
+          [core-lang-if if]
           ;; prim ops
           [core-lang-+ +]
           [core-lang-- -]
           [core-lang-* *]
-          [core-lang-/ /]))
+          [core-lang-quotient quo]
+          [core-lang-remainder rem]
+          [core-lang-< <]
+          [core-lang-> >]
+          [core-lang-= =]))
 
 (require syntax/parse/define
          macrotypes-nonstx/type-macros
@@ -36,12 +41,11 @@
 
 ;; ----------------------------------------------------
 
-(define-syntax Int
-  (id-transformer
-   (cases
-    [⊢≫type⇐
-     [dke ⊢ _]
-     (type-stx (Int))])))
+(define-for-syntax (prim-type-transformer t)
+  (id-transformer (cases [⊢≫type⇐ [dke ⊢ _] (type-stx t)])))
+
+(define-syntax Int (prim-type-transformer (Int)))
+(define-syntax Bool (prim-type-transformer (Bool)))
 
 (define-typed-syntax ->
   [⊢≫type⇐
@@ -118,7 +122,8 @@
    ;(ec dke ⊢ #'τ-stx ≫ τ type⇐)
    (define τ (expand-type/dke dke #'τ-stx))
    (er ⊢≫decl⇒
-       ≫ #`(val x : #,(type-stx τ) . stuff)
+       ≫ (quasisyntax/loc this-syntax
+           (val x : #,(type-stx τ) . stuff))
        decl⇒ (list (list #'x (val-binding τ))))]
   ;; pass 3
   [⊢≫val-def⇐
@@ -135,7 +140,8 @@
   [⊢≫decl-kinds⇒
    [⊢ #'(_ X:id . stuff)]
    (er ⊢≫decl-kinds⇒
-       ≫ #'(type X . stuff)
+       ≫ (syntax/loc this-syntax
+           (type X . stuff))
        decl-kinds⇒ (list (list #'X 'type)))]
   ;; pass 2
   [⊢≫decl⇒
@@ -259,6 +265,20 @@
    (ec body-G ⊢ #'body ≫ #'body- ⇒ τ_b)
    (er ⊢≫⇒ ≫ #`(let ([x e-] ...) body-) ⇒ τ_b)])
 
+(define-typed-syntax core-lang-if
+  [⊢≫⇐
+   [G ⊢ #'(_ que thn els) ⇐ τ]
+   (ec G ⊢ #'que ≫ #'que- ⇐ (Bool))
+   (ec G ⊢ #'thn ≫ #'thn- ⇐ τ)
+   (ec G ⊢ #'els ≫ #'els- ⇐ τ)
+   (er ⊢≫⇐ ≫ #'(if que- thn- els-))]
+  [⊢≫⇒
+   [G ⊢ #'(_ que thn els)]
+   (ec G ⊢ #'que ≫ #'que- ⇐ (Bool))
+   (ec G ⊢ #'thn ≫ #'thn- ⇒ τ)
+   (ec G ⊢ #'els ≫ #'els- ⇐ τ)
+   (er ⊢≫⇒ ≫ #'(if que- thn- els-) ⇒ τ)])
+
 ;; ---------------------------------------------------------
 
 (define-for-syntax (typed-prim-transformer internal type)
@@ -280,5 +300,9 @@
          (define-typed-prim X ty) ...)]))
 
 (define-typed-prim
-  [+ - * /]
+  [+ - * quotient remainder]
   (Arrow (list (Int) (Int)) (Int)))
+
+(define-typed-prim
+  [< > =]
+  (Arrow (list (Int) (Int)) (Bool)))

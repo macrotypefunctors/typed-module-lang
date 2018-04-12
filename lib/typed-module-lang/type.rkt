@@ -64,6 +64,7 @@
 ;;   - TODO: ∀
 
 (struct Int [] #:prefab)
+(struct Bool [] #:prefab)
 (struct Arrow [inputs output] #:prefab)
 (struct named-reference [id] #:prefab)
 ;; TODO: think about named-reference more, symbol vs. identifier,

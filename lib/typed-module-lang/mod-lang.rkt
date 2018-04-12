@@ -336,4 +336,4 @@
 
   [else
    #:with (_ . rst) this-syntax
-   #'(core-#%app . rst)])
+   (syntax/loc this-syntax (core-#%app . rst))])

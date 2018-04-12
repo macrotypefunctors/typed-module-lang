@@ -76,6 +76,13 @@
   (match τ
     [(dot M x)
      (dot (tnr-f M) x)]
+    [(? sig? s)
+     (for/hash ([(k v) (in-hash s)])
+       (values k (match v
+                   [(val-decl τ) (val-decl (tnr-f τ))]
+                   [(type-opaque-decl) (type-opaque-decl)]
+                   [(type-alias-decl τ) (type-alias-decl (tnr-f τ))]
+                   [(mod-decl s) (mod-decl (tnr-f s))])))]
     [_
      (type-transform-named-reference/recur τ f transform-named-reference)]))
 
@@ -157,17 +164,18 @@
 ;; Sig Id Id -> Sig
 ;; substitutes module references 'x-from' with 'x-to'
 (define (signature-subst-id S x-from x-to)
-  (unless (free-identifier=? x-from x-to)
-    (error 'signature-subst-id "TODO. identifiers not equal"))
-  S)
+  (signature-subst S x-from (named-reference x-to)))
 
 ;; Sig Id Path -> Sig
 ;; substites module references 'x-from' with 'path'
-;; TODO: ????????????????????
 (define (signature-subst S x-from path)
-  (unless (identifier? path)
-    (error 'signature-subst "TODO: paths?"))
-  (signature-subst-id S x-from path))
+  (transform-named-reference
+   S
+   (λ (x)
+     (cond [(and (identifier? x) (free-identifier=? x-from x))
+            path]
+           [else
+            (named-reference x)]))))
 
 ;; ---------------------------------------------------------
 

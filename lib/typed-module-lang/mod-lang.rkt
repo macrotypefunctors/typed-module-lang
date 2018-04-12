@@ -95,7 +95,7 @@
     (define type/mod-id-syms
       (map list type/mod-ids (map syntax-e type/mod-ids)))
 
-    (define (resolve-ids/τ τ)
+    (define (resolve-ids τ)
       (named-reference-map
        (λ (x)
          (match (and (identifier? x)
@@ -104,26 +104,18 @@
            [(list _ sym) sym]))
        τ))
 
-    (define (resolve-ids/s s)
-      (for/hash ([(k v) (in-hash s)])
-        (values k (match v
-                    [(val-decl τ) (val-decl (resolve-ids/τ τ))]
-                    [(type-opaque-decl) (type-opaque-decl)]
-                    [(type-alias-decl τ) (type-alias-decl (resolve-ids/τ τ))]
-                    [(mod-decl s) (mod-decl (resolve-ids/s s))]))))
-
     (for/hash ([p (in-list module-G)])
       (match-define (list id binding) p)
       (define decl
         (match binding
-          [(val-binding τ) (val-decl (resolve-ids/τ τ))]
+          [(val-binding τ) (val-decl (resolve-ids τ))]
           [(type-binding decl)
            (match decl
-             [(type-alias-decl τ) (type-alias-decl (resolve-ids/τ τ))]
+             [(type-alias-decl τ) (type-alias-decl (resolve-ids τ))]
              [(type-opaque-decl) decl])]
 
           [(mod-binding sig)
-           (mod-decl (resolve-ids/s sig))]))
+           (mod-decl (resolve-ids sig))]))
       ;; convert identifiers into symbols for the signature
       (values (syntax-e id) decl))))
 

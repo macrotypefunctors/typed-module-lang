@@ -86,35 +86,44 @@
 (begin-for-syntax
   ;; Env -> Sig
   (define (module-env->sig module-G)
-    (define type-ids
+    (define type/mod-ids
       (for/list ([entry (in-list module-G)]
-                 #:when (type-binding? (second entry)))
+                 #:when (or (type-binding? (second entry))
+                            (mod-binding? (second entry))))
         (first entry)))
 
-    (define type-id-syms
-      (map list type-ids (map syntax-e type-ids)))
+    (define type/mod-id-syms
+      (map list type/mod-ids (map syntax-e type/mod-ids)))
 
-    (define (resolve-ids τ)
+    (define (resolve-ids/τ τ)
       (named-reference-map
        (λ (x)
-         (match (assoc x type-id-syms free-identifier=?)
+         (match (and (identifier? x)
+                     (assoc x type/mod-id-syms free-identifier=?))
            [#f x]
            [(list _ sym) sym]))
        τ))
+
+    (define (resolve-ids/s s)
+      (for/hash ([(k v) (in-hash s)])
+        (values k (match v
+                    [(val-decl τ) (val-decl (resolve-ids/τ τ))]
+                    [(type-opaque-decl) (type-opaque-decl)]
+                    [(type-alias-decl τ) (type-alias-decl (resolve-ids/τ τ))]
+                    [(mod-decl s) (mod-decl (resolve-ids/s s))]))))
 
     (for/hash ([p (in-list module-G)])
       (match-define (list id binding) p)
       (define decl
         (match binding
-          [(val-binding τ) (val-decl (resolve-ids τ))]
+          [(val-binding τ) (val-decl (resolve-ids/τ τ))]
           [(type-binding decl)
            (match decl
-             [(type-alias-decl τ) (type-alias-decl (resolve-ids τ))]
+             [(type-alias-decl τ) (type-alias-decl (resolve-ids/τ τ))]
              [(type-opaque-decl) decl])]
 
           [(mod-binding sig)
-           ;; TODO: resolve-ids somewhere in a submodule sig?
-           (mod-decl sig)]))
+           (mod-decl (resolve-ids/s sig))]))
       ;; convert identifiers into symbols for the signature
       (values (syntax-e id) decl))))
 
@@ -183,8 +192,8 @@
    (define s_x
      (match (sig-ref s (syntax-e #'x))
        [(mod-decl m-sig)
-        ;; TODO: qualify something?
-        m-sig]
+        (define qenv (extend-qual-env (hash) s (attribute m.path)))
+        (qualify-sig qenv m-sig)]
        [_ (raise-syntax-error #f "not a submodule" #'x)]))
 
    (er ⊢≫sig⇒ ≫ #'(hash-ref m- 'x)
@@ -208,10 +217,11 @@
   ;; pass 2 of core-lang-tc-passes
   [⊢≫decl⇒ [_ ⊢ stx] (er ⊢≫decl⇒ ≫ stx decl⇒ '())]
   ;; pass 3 of cole-rang-tc-passes
-  [⊢≫val-def⇐
-   [_ ⊢ #'(_ name m-)]
-   (er ⊢≫val-def⇐ ≫ #'(define name m-))])
-
+  [⊢≫val-def⇐ [_ ⊢ stx] (er ⊢≫val-def⇐ ≫ stx)]
+  ;; else
+  [else
+   #:with (_ name m-) this-syntax
+   #'(define name m-)])
 
 (define-typed-syntax define-signature
   #:datum-literals [=]

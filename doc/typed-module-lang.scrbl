@@ -59,9 +59,6 @@ Interposition point for literals. Supports exact integers and booleans.
 Locally binds @racket[_id]s within @racket[_body-expr].
 }
 
-@defform[(inst {type ...} expr)]{
-Instantiation of quantified types. UNIMPLEMENTED. }
-
 @defform[(if question-expr then-expr else-expr)]{
 Evaluates @racket[_then-expr] if @racket[_question-expr] evaluates
 to @racket[#t], otherwise evaluates @racket[_else-expr].
@@ -70,6 +67,9 @@ to @racket[#t], otherwise evaluates @racket[_else-expr].
 (val not : (-> Bool Bool)
   (λ (x) (if x #f #t)))]
 }
+
+@defform[(inst {type ...} expr)]{Instantiates a polymorphic expression. UNIMPLEMENTED. }
+@defform[(Λ (type ...) expr)]{Universally quantifies an expression. UNIMPLEMENTED. }
 
 @deftogether[
  [@defthing[+ (-> Int Int Int)]
@@ -124,12 +124,11 @@ Creates a module structure consisting of the given definitions.
 
 @racketblock[
 (define-module Image =
-  (mod
-    (type Color = Int)
-    (type Image = (-> Int Int Color))
-    (val black : Color = 0)
-    (val white : Color = 100)
-    (val blank : Image = (λ (x y) white))))]
+  (mod (type Color = Int)
+       (type Image = (-> Int Int Color))
+       (val black : Color = 0)
+       (val white : Color = 100)
+       (val blank : Image = (λ (x y) white))))]
 
 Module structures are allowed to contain @racket[check]s, which are
 run when the module is instantiated.
@@ -145,11 +144,11 @@ Module structures may contain submodules, using nested @racket[define-module]s:
 (define-module Painting =
   (mod
     (define-module Brush =
-      (mod (type T = (-> Int Int))
-           (val get-size : (-> T Int) (λ (br) (br 0)))
-           (val get-color : (-> T Image.Color) (λ (br) (br 1)))))
+      (mod (type T = (-> Bool Int))
+           (val size : (-> T Int) (λ (br) (br #t)))
+           (val color : (-> T Image.Color) (λ (br) (br #f)))))
     (val default-brush : Brush.T =
-      (λ (i) (if (= i 0) 1 Color.black)))))]
+      (λ (i) (if i 1 Color.black)))))]
 
 Submodules are experimental and sometimes act in unexpected ways. For instance,
 all submodule definitions are moved to the front of a module, and may only
@@ -183,7 +182,7 @@ These forms are for signature expressions.
          (sig component ...)
          #:grammar
          ([component
-           (@#,racket[val] id : @#,racket[_type] = expr)
+           (@#,racket[val] id : @#,racket[_type])
            (@#,racket[type] id = rhs-type)
            (@#,racket[type] id)])]{
 Creates a module signature specifying the given value and type bindings.
@@ -222,7 +221,7 @@ input and output signatures. @racket[_id] is bound within @racket[_out-sig-expr]
    body of a @racket[val] definition).}
 
    @spec[m (λ ([id : sig-expr]) mod-expr)]{
-   A functor module. Parameterizes @racket[_mod-expr] over modules
+   Produces a functor module which parameterizes @racket[_mod-expr] over modules
    with signature @racket[_sig-expr]. Can be instantiated with @ref[#%app m].
    Functors may be curried. })
 
@@ -238,7 +237,7 @@ input and output signatures. @racket[_id] is bound within @racket[_out-sig-expr]
    @spec[m (#%app functor-expr mod-path)]{
    Instantiates the functor module @racket[_functor-expr] with @racket[_mod-path].
    Note that the argument must be a path (a series of @ref[#%dot m] or @ref[#%var m]s);
-   arbitrary modules are not supported.
+   arbitrary module expressions are not supported.
    })
 
 @;---------------------------------------------------------------------------------

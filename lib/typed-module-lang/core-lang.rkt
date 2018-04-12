@@ -173,9 +173,6 @@
   [⊢≫type⇐
    [dke ⊢ #'(_ x:id)]
    ;; don't return er, return type-stx with a *type struct* instead
-   ;; TODO: think more about whether this `named-referenced` thing
-   ;;       should use an identifier or a symbol, or whether it should
-   ;;       use something else entirely
    (type-stx (named-reference #'x))])
 
 (define-typed-syntax core-lang-datum

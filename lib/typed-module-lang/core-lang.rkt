@@ -2,7 +2,7 @@
 
 (provide (for-syntax core-lang-tc-passes)
          ; types
-         Int ->
+         Int Bool ->
          ; forms
          val
          type
@@ -199,7 +199,10 @@
 (define-typed-syntax core-lang-datum
   [⊢≫⇒
    [G ⊢ #'(_ . i:exact-integer)]
-   (er ⊢≫⇒ ≫ #''i ⇒ (Int))])
+   (er ⊢≫⇒ ≫ #''i ⇒ (Int))]
+  [⊢≫⇒
+   [G ⊢ #'(_ . {~and b {~or #t #f}})]
+   (er ⊢≫⇒ ≫ #''b ⇒ (Bool))])
 
 (begin-for-syntax
   ;; traverses type aliases until an Arrow type is found.

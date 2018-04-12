@@ -8,7 +8,8 @@
                      [mod-lang-lambda lambda]
                      [mod-lang-lambda λ]
                      [mod-lang-#%app #%app]
-                     [mod-lang-where where])
+                     [mod-lang-where where]
+                     [core-let let])
          define-module
          mod
          seal
@@ -22,6 +23,7 @@
          (rename-in (except-in "core-lang.rkt" #%module-begin λ)
                     [#%var core-#%var]
                     [lambda core-lambda]
+                    [let core-let]
                     [#%app core-#%app])
          (for-syntax racket/base
                      racket/function
@@ -56,7 +58,7 @@
     (define-values [ds/1234 module-env]
       (core-lang-tc-passes G+modules ds/0))
     (values ds/1234 (append module-env module-bindings)))
-  
+
   ;; mod-lang-sc-passes :
   ;; [Listof Stx] -> (values [Listof Stx] Env)
   (define (mod-lang-sc-passes ds)
@@ -248,7 +250,7 @@
    #:with [[k/v ...] ...]
    #'[['x x] ...]
    (er ⊢≫sig⇒
-       ≫ #`(local [#,@ds-] (hash k/v ... ...))
+       ≫ #`(let () #,@ds- (hash k/v ... ...))
        sig⇒ module-sig)])
 
 (define-typed-syntax seal
@@ -357,4 +359,3 @@
     (sig-where base sym τ))])
 
 ;; --------------------------------------------------------------
-

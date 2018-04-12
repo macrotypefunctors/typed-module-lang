@@ -25,3 +25,8 @@
      Math*.mul2)))
 
 ;; NOTE: Math.T and Math*.T are incompatible (intentional)
+
+(define-module Test =
+  (mod
+   (check (Math.add1 4) = 5)
+   (check (Math.mul2 4) = 8)))

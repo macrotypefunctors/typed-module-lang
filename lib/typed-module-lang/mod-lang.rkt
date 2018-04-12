@@ -324,14 +324,16 @@
 (define-typed-syntax mod-lang-#%app
   ;; as a module
   [⊢≫sig⇒
-     [G ⊢ #'(_ fun ~! arg:id)]
+     [G ⊢ #'(_ fun ~! arg:module-path)]
      ;; TODO: allow arg to be arbitrary module expression
      ;;   ... may require figuring out how to solve let vs. submodule ?
      (ec G ⊢ #'fun ≫ #'fun- sig⇒ (pi-sig x A B))
      (ec G ⊢ #'arg ≫ #'arg- sig⇒ A*)
      (unless (signature-matches? G A* A)
-       (raise-syntax-error #f "signature mismatch" #'arg))
-     (define B* (signature-subst B x #'arg))
+       (raise-syntax-error #f
+         (format "signature mismatch\n  expected: ~v\n  given:    ~v" A A*)
+         #'arg))
+     (define B* (signature-subst B x (attribute arg.path)))
      (er ⊢≫sig⇒ ≫ #'(fun- arg-)
          sig⇒ B*)]
 

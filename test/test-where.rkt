@@ -30,7 +30,7 @@
        :>
        (where C X = A.X)))))
 
-(define-module B* = (seal (B*/A A*) :> (where B X = A*.X)))
+(define-module B* = (B*/A A*))  ; (where B X = A*.X)
 (define-module C* = (seal ((C*/AB A*) B*) :> C))
 
 

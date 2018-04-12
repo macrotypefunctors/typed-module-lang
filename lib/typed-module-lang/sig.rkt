@@ -83,6 +83,12 @@
                    [(type-opaque-decl) (type-opaque-decl)]
                    [(type-alias-decl τ) (type-alias-decl (tnr-f τ))]
                    [(mod-decl s) (mod-decl (tnr-f s))])))]
+    [(pi-sig x A B)
+     ;; TODO: scope stuff for x? This function is used for identifier
+     ;;       substitution, so it should respect scope somehow. When `x`
+     ;;       shadows one of the bindings being substituted, it shouldn't
+     ;;       substitute that binding within `B`.
+     (pi-sig x (tnr-f A) (tnr-f B))]
     [_
      (type-transform-named-reference/recur τ f transform-named-reference)]))
 

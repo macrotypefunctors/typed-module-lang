@@ -42,6 +42,8 @@ with @racket[_rhs-type].
          (check actual-expr = expected-expr)]{
 Performs a test that the two expressions yield the same value. Internally
 uses rackunit's @racket[check-equal?].
+
+@racketblock[(check (fib 16) = 987)]
 }
 
 @;---------------------------------------------------------------------------------
@@ -57,6 +59,8 @@ Interposition point for literals. Supports exact integers and booleans.
 
 @defform[(let ([id expr] ...) body-expr)]{
 Locally binds @racket[_id]s within @racket[_body-expr].
+
+@racketblock[(let ([x 9]) (+ x 1))]
 }
 
 @defform[(if question-expr then-expr else-expr)]{

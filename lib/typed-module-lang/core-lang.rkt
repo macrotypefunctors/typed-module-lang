@@ -158,6 +158,14 @@
    [_ ⊢ stx]
    (er ⊢≫val-def⇐ ≫ #'(begin))])
 
+(define-for-syntax (prettify/#%dot dat)
+  (match dat
+    [(list '#%dot x y)
+     (format "~a.~a" (prettify/#%dot x) (prettify/#%dot y))]
+    [_ (format "~a" (if (list? dat)
+                        (map prettify/#%dot dat)
+                        dat))]))
+
 (define-typed-syntax check
   #:datum-literals [=]
   ;; pass 1
@@ -167,9 +175,12 @@
   ;; pass 3
   [⊢≫val-def⇐
    [G ⊢ #'(_ e1 = e2)]
+   #:with msg (format "~a = ~a"
+                      (prettify/#%dot (syntax->datum #'e1))
+                      (prettify/#%dot (syntax->datum #'e2)))
    (ec G ⊢ #'e1 ≫ #'e1- ⇒ τ)
    (ec G ⊢ #'e2 ≫ #'e2- ⇐ τ)
-   (er ⊢≫val-def⇐ ≫ #'(check-equal? e1- e2-))])
+   (er ⊢≫val-def⇐ ≫ #'(check-equal? e1- e2- 'msg))])
 
 ;; ----------------------------------------------------
 

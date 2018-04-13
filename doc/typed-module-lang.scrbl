@@ -68,7 +68,7 @@ Evaluates @racket[_then-expr] if @racket[_question-expr] evaluates
 to @racket[#t], otherwise evaluates @racket[_else-expr].
 
 @racketblock[
-(val not : (-> Bool Bool)
+(val not : (-> Bool Bool) =
   (λ (x) (if x #f #t)))]
 }
 
@@ -172,15 +172,15 @@ Seals the module @racket[_mod-expr] to be constrained by
 the signature @racket[_sig-expr].
 
 @racketblock[
-(define-signature COUNT
+(define-signature COUNT =
   (type T)
   (val dec : (-> T T))
   (val inc : (-> T T)))
 
-(define-module Count
+(define-module Count =
   (seal (mod (type T = Int)
-             (val inc : (-> T T) (λ (x) (+ x 1)))
-             (val dec : (-> T T) (λ (x) (- x 1))))
+             (val inc : (-> T T) = (λ (x) (+ x 1)))
+             (val dec : (-> T T) = (λ (x) (- x 1))))
         :> COUNT))
 
 (val n : Int = (Count.inc 0)) (code:comment @#,elem{Does not typecheck, since T is opaque})]}

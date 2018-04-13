@@ -37,6 +37,8 @@
                      "type-check.rkt"
                      "sig.rkt"
                      "type.rkt"
+                     "print/print-type.rkt"
+                     "print/print-env.rkt"
                      "util/for-acc.rkt"))
 
 ;; --------------------------------------------------------------
@@ -79,7 +81,7 @@
     [(_ d:expr ...)
      (define-values [ds- G]
        (mod-lang-sc-passes (@ d)))
-     (pretty-print G)
+     (print-env G)
      #`(#%module-begin #,@ds-)]))
 
 ;; --------------------------------------------------------------
@@ -262,9 +264,9 @@
    #:fail-unless (signature-matches? external-G s-actual s-expected)
    ;; TODO: smaller error messages that say something like
    ;;       "this component is missing" or "this component has the wrong type"
-   (format "signature mismatch:\n  expected: ~v\n  given:    ~v\n"
-           s-expected
-           s-actual)
+   (format "signature mismatch:\n  expected: ~a\n  given:    ~a\n"
+           (sig->string s-expected)
+           (sig->string s-actual))
    (er ⊢m≫sig⇒
        ≫ #'m-
        sig⇒ s-expected)])
@@ -333,7 +335,8 @@
      (ec G ⊢m #'arg ≫ #'arg- sig⇒ A*)
      (unless (signature-matches? G A* A)
        (raise-syntax-error #f
-         (format "signature mismatch\n  expected: ~v\n  given:    ~v" A A*)
+         (format "signature mismatch\n  expected: ~a\n  given:    ~a"
+                 (sig->string A) (sig->string A*))
          #'arg))
      (define B* (signature-subst B x (attribute arg.path)))
      (er ⊢m≫sig⇒ ≫ #'(fun- arg-)

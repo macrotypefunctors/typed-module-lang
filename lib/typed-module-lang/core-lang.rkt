@@ -38,6 +38,8 @@
                      macrotypes-nonstx/id-transformer
                      "type-check.rkt"
                      "type.rkt"
+                     "print/print-type.rkt"
+                     "print/print-env.rkt"
                      "util/for-acc.rkt"
                      ))
 
@@ -102,7 +104,7 @@
     [(_ d:expr ...)
      (define-values [ds- G]
        (core-lang-tc-passes '() (attribute d)))
-     (pretty-print G)
+     (print-env G)
      #`(#%module-begin #,@ds-)]))
 
 ;; ----------------------------------------------------
@@ -262,7 +264,7 @@
      (match (find-arrow-type G τ-fn)
        [(Arrow i o) (values i o)]
        [_ (raise-syntax-error #f
-            (format "cannot apply non-function type ~a" τ-fn)
+            (format "cannot apply non-function type ~a" (type->string τ-fn))
             this-syntax)]))
    ;; compare # of arguments
    (unless (= (length τ-ins) (length (attribute arg)))

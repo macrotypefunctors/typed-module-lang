@@ -12,7 +12,8 @@
          macrotypes-nonstx/type-prop
          macrotypes-nonstx/type-check
          "type.rkt"
-         "sig.rkt")
+         "sig.rkt"
+         "print/print-type.rkt")
 
 ;; -------------------------------------------------------------------
 
@@ -105,8 +106,9 @@
    (ec G ⊢e expr ≫ expr- ⇒ τ-actual)
    (unless (type-matches? G τ-actual τ-expected)
      (raise-syntax-error #f
-       (format "type mismatch\n  expected: ~v\n  given:    ~v"
-               τ-expected τ-actual)
+       (format "type mismatch\n  expected: ~a\n  given:    ~a"
+               (type->string τ-expected)
+               (type->string τ-actual))
        expr))
    (er ⊢e≫⇐ ≫ expr-)])
 

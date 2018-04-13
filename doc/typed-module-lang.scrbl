@@ -110,12 +110,21 @@ Quantified types. UNIMPLEMENTED. }
          (define-module id = mod-expr)]{
 Creates a module binding. The @racket[_mod-expr] is immediately
 instantiated if it is not a functor.
+
+@racketblock[
+(define-module M =
+  (mod (val x : Int = 4)))]
 }
 
 @defform[#:literals [=]
          (define-signature id = sig-expr)]{
 Declares a signature alias, allowing @racket[_id] to be used interchangeably
-with @racket[_sig-expr].}
+with @racket[_sig-expr].
+
+@racketblock[
+(define-signature S =
+  (sig (val x : Int)))]
+}
 
 @;---------------------------------------------------------------------------------
 @subsection{Module Expressions}

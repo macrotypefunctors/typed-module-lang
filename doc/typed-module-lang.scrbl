@@ -208,6 +208,8 @@ to be ``opaque''.
        (type Op = (-> T T))
        (val x : T)
        (val f : Op)))]
+
+Opaque type components can be refined using a @racket[where] signature.
 }
 
 @defform[#:literals [:]
@@ -220,6 +222,19 @@ input and output signatures. @racket[_id] is bound within @racket[_out-sig-expr]
   (Π ([m : S])
     (sig (type T = m.T)
          (val y : T))))]
+}
+
+@defform[#:literals [=]
+         (where sig-expr type-id = rhs-type)]{
+Refines the opaque type declaration for @racket[_type-id] within @racket[_sig-expr],
+changing it into an alias to @racket[_rhs-type].
+
+@racketblock[
+(define-signature S  = (sig (type T)))
+(define-signature S* = (where S T = Int))
+(define-module M = (seal (mod (type T = Int)) :> S*))
+(define-module N = (seal (mod (type T = Bool)) :> S*)) (code:comment @#,elem{signature mismatch})
+]
 }
 
 @;=================================================================================

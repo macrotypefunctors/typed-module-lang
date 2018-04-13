@@ -200,12 +200,27 @@ These forms are for signature expressions.
            (@#,racket[type] id)])]{
 Creates a module signature specifying the given value and type bindings.
 A @racket[type] binding with no right-hand side declares the type binding
-to be ``opaque''. }
+to be ``opaque''.
+
+@racketblock[
+(define-signature S =
+  (sig (type T)
+       (type Op = (-> T T))
+       (val x : T)
+       (val f : Op)))]
+}
 
 @defform[#:literals [:]
          (Π ([id : in-sig-expr]) out-sig-expr)]{
 Creates a module signature specifying functors with the given
-input and output signatures. @racket[_id] is bound within @racket[_out-sig-expr]. }
+input and output signatures. @racket[_id] is bound within @racket[_out-sig-expr].
+
+@racketblock[
+(define-signature F =
+  (Π ([m : S])
+    (sig (type T = m.T)
+         (val y : T))))]
+}
 
 @;=================================================================================
 @section{Context-Dependent Forms}

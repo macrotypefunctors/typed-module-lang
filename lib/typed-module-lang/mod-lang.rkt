@@ -144,7 +144,7 @@
    (type-stx s)]
   [else
    #:with (_ . rst) this-syntax
-   #'(core-#%var . rst)])
+   (syntax/loc this-syntax (core-#%var . rst))])
 
 ;; --------------------------------------------------------------
 

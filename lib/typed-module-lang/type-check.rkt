@@ -1,8 +1,10 @@
 #lang racket/base
 
-(provide (all-from-out macrotypes-nonstx/type-check)
-         (all-defined-out)
-         cases)
+(provide (all-defined-out)
+         cases
+         ec
+         er
+         ⊢ ≫ ⇐ ⇒)
 
 (require racket/list
          racket/match
@@ -19,8 +21,8 @@
 ;; pass 0 of mod-body-tc-passes
 (define-expand-check-relation sc/def/submod
   [external-G module-def -> module-def- intro-env]
-  [external-G ⊢ module-def ≫ module-def- submoddef⇒ intro-env]
-  [external-G ⊢ module-def]
+  [external-G ⊢md module-def ≫ module-def- submoddef⇒ intro-env]
+  [external-G ⊢md module-def]
   [≫ module-def- submoddef⇒ intro-env]
   #:in-stx module-def
   #:out-stx module-def-
@@ -45,9 +47,9 @@
   #:stop-ids '()
   #:bad-output (raise-syntax-error #f "expected a type or val declaration" decl)
   #:implicit-rule
-  [⊢≫submoddef⇒
-   [G ⊢ stx]
-   (er ⊢≫submoddef⇒ ≫ stx submoddef⇒ '())])
+  [⊢md≫submoddef⇒
+   [G ⊢md stx]
+   (er ⊢md≫submoddef⇒ ≫ stx submoddef⇒ '())])
 
 ;; expand types within declarations to build the module's environment
 ;; TODO: when do we check for recursion in type aliases? what information do we need?
@@ -79,8 +81,8 @@
 (define-expand-check-relation tc/chk
   ;; G : Env
   [G expr type -> expr-]
-  [G ⊢ expr ≫ expr- ⇐ type]
-  [G ⊢ expr ⇐ type]
+  [G ⊢e expr ≫ expr- ⇐ type]
+  [G ⊢e expr ⇐ type]
   [≫ expr-]
   #:in-stx expr
   #:out-stx expr-
@@ -90,23 +92,23 @@
 (define-expand-check-relation tc
   ;; G : Env
   [G expr -> expr- type]
-  [G ⊢ expr ≫ expr- ⇒ type]
-  [G ⊢ expr]
+  [G ⊢e expr ≫ expr- ⇒ type]
+  [G ⊢e expr]
   [≫ expr- ⇒ type]
   #:in-stx expr
   #:out-stx expr-
   #:stop-ids (map first G)
   #:bad-output (raise-syntax-error #f "expected a typed expression" expr)
   #:implicit-rule
-  [⊢≫⇐
-   [G ⊢ expr ⇐ τ-expected]
-   (ec G ⊢ expr ≫ expr- ⇒ τ-actual)
+  [⊢e≫⇐
+   [G ⊢e expr ⇐ τ-expected]
+   (ec G ⊢e expr ≫ expr- ⇒ τ-actual)
    (unless (type-matches? G τ-actual τ-expected)
      (raise-syntax-error #f
        (format "type mismatch\n  expected: ~v\n  given:    ~v"
                τ-expected τ-actual)
        expr))
-   (er ⊢≫⇐ ≫ expr-)])
+   (er ⊢e≫⇐ ≫ expr-)])
 
 ;; -------------------------------------------------------------------
 ;; expanding types
@@ -114,8 +116,8 @@
 (define-expand-check-relation tc/type
   ;; dke : DeclKindEnv
   [dke ty -> ty-]
-  [dke ⊢ ty ≫ ty- type⇐]
-  [dke ⊢ ty]
+  [dke ⊢τ ty ≫ ty- type⇐]
+  [dke ⊢τ ty]
   [≫ ty- type⇐]
   #:in-stx ty
   #:out-stx ty-
@@ -133,8 +135,8 @@
 ;; sc means "sig check"
 (define-expand-check-relation sc
   [external-G module-expr -> module-expr- signature-expr]
-  [external-G ⊢ module-expr ≫ module-expr- sig⇒ signature-expr]
-  [external-G ⊢ module-expr]
+  [external-G ⊢m module-expr ≫ module-expr- sig⇒ signature-expr]
+  [external-G ⊢m module-expr]
   [≫ module-expr- sig⇒ signature-expr]
   #:in-stx module-expr
   #:out-stx module-expr-
@@ -144,8 +146,8 @@
 
 (define-expand-check-relation sc/sig
   [external-G signature-expr -> signature-expr-]
-  [external-G ⊢ signature-expr ≫ signature-expr- signature⇐]
-  [external-G ⊢ signature-expr]
+  [external-G ⊢s signature-expr ≫ signature-expr- signature⇐]
+  [external-G ⊢s signature-expr]
   [≫ signature-expr- signature⇐]
   #:in-stx signature-expr
   #:out-stx signature-expr-
@@ -165,8 +167,8 @@
 
 (define-expand-check-relation sc/def/top
   [external-G module-def -> module-def- intro-env]
-  [external-G ⊢ module-def ≫ module-def- modsigdef⇒ intro-env]
-  [external-G ⊢ module-def]
+  [external-G ⊢md module-def ≫ module-def- modsigdef⇒ intro-env]
+  [external-G ⊢md module-def]
   [≫ module-def- modsigdef⇒ intro-env]
   #:in-stx module-def
   #:out-stx module-def-
@@ -181,8 +183,8 @@
 
 (define-expand-check-relation sc/moddef
   [external-G module-def -> module-def- intro-env]
-  [external-G ⊢ module-def ≫ module-def- moddef⇒ intro-env]
-  [external-G ⊢ module-def]
+  [external-G ⊢md module-def ≫ module-def- moddef⇒ intro-env]
+  [external-G ⊢md module-def]
   [≫ module-def- moddef⇒ intro-env]
   #:in-stx module-def
   #:out-stx module-def-
@@ -190,24 +192,24 @@
   #:bad-output
   (raise-syntax-error #f "expected a typed module definition" module-def)
   #:implicit-rule
-  [⊢≫modsigdef⇒
-   [G ⊢ module-def]
-   (ec G ⊢ module-def ≫ module-def- moddef⇒ intro-env)
-   (er ⊢≫modsigdef⇒ ≫ module-def- modsigdef⇒ intro-env)]
+  [⊢md≫modsigdef⇒
+   [G ⊢md module-def]
+   (ec G ⊢md module-def ≫ module-def- moddef⇒ intro-env)
+   (er ⊢md≫modsigdef⇒ ≫ module-def- modsigdef⇒ intro-env)]
   #:implicit-rule
-  [⊢≫submoddef⇒
-   [G ⊢ module-def]
-   (ec G ⊢ module-def ≫ module-def- moddef⇒ intro-env)
-   (er ⊢≫submoddef⇒ ≫ module-def- submoddef⇒ intro-env)]
+  [⊢md≫submoddef⇒
+   [G ⊢md module-def]
+   (ec G ⊢md module-def ≫ module-def- moddef⇒ intro-env)
+   (er ⊢md≫submoddef⇒ ≫ module-def- submoddef⇒ intro-env)]
   )
 
 ;; implicit rules:
 ;;
-;;   G ⊢ module-def ≫ module-def- moddef⇒ intro-env
+;;   G ⊢md module-def ≫ module-def- moddef⇒ intro-env
 ;;   --------------------------------------------------
-;;   G ⊢ module-def ≫ module-def- modsigdef⇒ intro-env
+;;   G ⊢md module-def ≫ module-def- modsigdef⇒ intro-env
 ;;
-;;   G ⊢ module-def ≫ module-def- moddef⇒ intro-env
+;;   G ⊢md module-def ≫ module-def- moddef⇒ intro-env
 ;;   --------------------------------------------------
-;;   G ⊢ module-def ≫ module-def- submoddef⇒ intro-env
+;;   G ⊢md module-def ≫ module-def- submoddef⇒ intro-env
 

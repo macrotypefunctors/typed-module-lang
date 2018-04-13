@@ -51,7 +51,7 @@
       (for/list/acc ([G '()])
                     ([d (in-list ds)])
         (define G+external (append G external-G))
-        (ec G+external ⊢ d ≫ d- submoddef⇒ G+)
+        (ec G+external ⊢md d ≫ d- submoddef⇒ G+)
         (values (append G+ G)
                 d-)))
     (define G+modules (append module-bindings external-G))
@@ -65,7 +65,7 @@
     (define-values [env ds/1]
       (for/list/acc ([G '()])
                     ([d (in-list ds)])
-        (ec G ⊢ d ≫ d- modsigdef⇒ G+)
+        (ec G ⊢md d ≫ d- modsigdef⇒ G+)
         (values (append G+ G)
                 d-)))
     (values ds/1 env)))
@@ -126,15 +126,15 @@
 
 (define-typed-syntax #%var
   ;; as a module
-  [⊢≫sig⇒
-   [G ⊢ #'(_ x:id)]
+  [⊢m≫sig⇒
+   [G ⊢m #'(_ x:id)]
    (define s
      (or (env-lookup-module G #'x)
          (raise-syntax-error #f "expected a module" #'x)))
-   (er ⊢≫sig⇒ ≫ #'x sig⇒ s)]
+   (er ⊢m≫sig⇒ ≫ #'x sig⇒ s)]
   ;; as a signature
-  [⊢≫signature⇐
-   [G ⊢ #'(_ x:id)]
+  [⊢s≫signature⇐
+   [G ⊢s #'(_ x:id)]
    (define s
      (or (env-lookup-signature G #'x)
          (raise-syntax-error #f "expected a module" #'x)))
@@ -156,9 +156,9 @@
 
 (define-typed-syntax #%dot
   ;; as an expression
-  [⊢≫⇒
-   [G ⊢ #'(_ m:module-path x:id)]
-   (ec G ⊢ #'m ≫ #'m- sig⇒ s)
+  [⊢e≫⇒
+   [G ⊢e #'(_ m:module-path x:id)]
+   (ec G ⊢m #'m ≫ #'m- sig⇒ s)
    (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
    (define τ_x
      (match (sig-ref s (syntax-e #'x))
@@ -166,13 +166,13 @@
         (define qenv (extend-qual-env (hash) s (attribute m.path)))
         (qualify-type qenv τ)]
        [_ (raise-syntax-error #f "not a value binding" #'x)]))
-   (er ⊢≫⇒ ≫ #'(hash-ref m- 'x) ⇒ τ_x)]
+   (er ⊢e≫⇒ ≫ #'(hash-ref m- 'x) ⇒ τ_x)]
 
   ;; as a type
-  [⊢≫type⇐
-   [dke ⊢ #'(_ m:module-path x:id)]
+  [⊢τ≫type⇐
+   [dke ⊢τ #'(_ m:module-path x:id)]
    (define G (filter (compose mod-binding? second) dke))
-   (ec G ⊢ #'m ≫ _ sig⇒ s)
+   (ec G ⊢m #'m ≫ _ sig⇒ s)
    (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
    (define comp (sig-ref s (syntax-e #'x)))
    (unless (or (type-alias-decl? comp) (type-opaque-decl? comp))
@@ -180,9 +180,9 @@
    (type-stx (dot (attribute m.path) (syntax-e #'x)))]
 
   ;; as a module expression
-  [⊢≫sig⇒
-   [G ⊢ #'(_ m:module-path x:id)]
-   (ec G ⊢ #'m ≫ #'m- sig⇒ s)
+  [⊢m≫sig⇒
+   [G ⊢m #'(_ m:module-path x:id)]
+   (ec G ⊢m #'m ≫ #'m- sig⇒ s)
    (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
    (define s_x
      (match (sig-ref s (syntax-e #'x))
@@ -191,7 +191,7 @@
         (qualify-sig qenv m-sig)]
        [_ (raise-syntax-error #f "not a submodule" #'x)]))
 
-   (er ⊢≫sig⇒ ≫ #'(hash-ref m- 'x)
+   (er ⊢m≫sig⇒ ≫ #'(hash-ref m- 'x)
        sig⇒ s_x)])
 
 
@@ -200,10 +200,10 @@
 (define-typed-syntax define-module
   #:datum-literals [=]
   ;; used in toplevel
-  [⊢≫moddef⇒
-   [external-G ⊢ #'(_ name:id = m:expr)]
-   (ec external-G ⊢ #'m ≫ #'m- sig⇒ s)
-   (er ⊢≫moddef⇒ ≫ #`(define-module/pass-1234 name m-)
+  [⊢md≫moddef⇒
+   [external-G ⊢md #'(_ name:id = m:expr)]
+   (ec external-G ⊢m #'m ≫ #'m- sig⇒ s)
+   (er ⊢md≫moddef⇒ ≫ #`(define-module/pass-1234 name m-)
        moddef⇒ (list (list #'name (mod-binding s))))])
 
 (define-typed-syntax define-module/pass-1234
@@ -220,10 +220,10 @@
 
 (define-typed-syntax define-signature
   #:datum-literals [=]
-  [⊢≫modsigdef⇒
-   [external-G ⊢ #'(_ name:id = s:expr)]
+  [⊢md≫modsigdef⇒
+   [external-G ⊢md #'(_ name:id = s:expr)]
    (define signature (expand-signature external-G #'s))
-   (er ⊢≫modsigdef⇒ ≫ #`(define-syntax name #f)
+   (er ⊢md≫modsigdef⇒ ≫ #`(define-syntax name #f)
        modsigdef⇒ (list (list #'name (sig-binding signature))))])
 
 ;; --------------------------------------------------------------
@@ -232,8 +232,8 @@
 ;; module-begin form, except that it has an output type
 
 (define-typed-syntax mod
-  [⊢≫sig⇒
-   [external-G ⊢ #'(_ d:expr ...)]
+  [⊢m≫sig⇒
+   [external-G ⊢m #'(_ d:expr ...)]
    ;; TODO: how should external-G be handled?
    ;; the module-sig should definitely *not*
    ;; include bindings from the external-G
@@ -249,15 +249,15 @@
                     (first entry))
    #:with [[k/v ...] ...]
    #'[['x x] ...]
-   (er ⊢≫sig⇒
+   (er ⊢m≫sig⇒
        ≫ #`(let () #,@ds- (hash k/v ... ...))
        sig⇒ module-sig)])
 
 (define-typed-syntax seal
   #:datum-literals [:>]
-  [⊢≫sig⇒
-   [external-G ⊢ #'(_ m:expr :> s-stx:expr)]
-   #:do [(ec external-G ⊢ #'m ≫ #'m- sig⇒ s-actual)
+  [⊢m≫sig⇒
+   [external-G ⊢m #'(_ m:expr :> s-stx:expr)]
+   #:do [(ec external-G ⊢m #'m ≫ #'m- sig⇒ s-actual)
          (define s-expected (expand-signature external-G #'s-stx))]
    #:fail-unless (signature-matches? external-G s-actual s-expected)
    ;; TODO: smaller error messages that say something like
@@ -265,18 +265,18 @@
    (format "signature mismatch:\n  expected: ~v\n  given:    ~v\n"
            s-expected
            s-actual)
-   (er ⊢≫sig⇒
+   (er ⊢m≫sig⇒
        ≫ #'m-
        sig⇒ s-expected)])
 
 (define-typed-syntax sig
   #:literals [val type]
   #:datum-literals [: =]
-  [⊢≫signature⇐
-   [external-G ⊢ #'(_ {~alt (val val-name : val-type)
-                            (type alias-name = alias-type)
-                            (type opaque-name)}
-                      ...)]
+  [⊢s≫signature⇐
+   [external-G ⊢s #'(_ {~alt (val val-name : val-type)
+                             (type alias-name = alias-type)
+                             (type opaque-name)}
+                       ...)]
 
    (define dke (map (λ (x) (list x 'type))
                     (append (@ alias-name) (@ opaque-name))))
@@ -300,8 +300,8 @@
 
 (define-typed-syntax Π
   #:datum-literals [:]
-  [⊢≫signature⇐
-   [external-G ⊢ #'(_ ([x:id : A-stx]) B-stx)]
+  [⊢s≫signature⇐
+   [external-G ⊢s #'(_ ([x:id : A-stx]) B-stx)]
    (define A (expand-signature external-G #'A-stx))
    (define body-G (cons (list #'x (mod-binding A)) external-G))
    (define B (expand-signature body-G #'B-stx))
@@ -311,12 +311,12 @@
 
 (define-typed-syntax mod-lang-lambda
   ;; as a module
-  [⊢≫sig⇒
-   [G ⊢ #'(_ ([x:id : A-stx]) body-module:expr)]
+  [⊢m≫sig⇒
+   [G ⊢m #'(_ ([x:id : A-stx]) body-module:expr)]
    (define A (expand-signature G #'A-stx))
    (define body-G (cons (list #'x (mod-binding A)) G))
-   (ec body-G ⊢ #'body-module ≫ #'body-module- sig⇒ B)
-   (er ⊢≫sig⇒ ≫ #'(λ (x) body-module-) sig⇒ (pi-sig #'x A B))]
+   (ec body-G ⊢m #'body-module ≫ #'body-module- sig⇒ B)
+   (er ⊢m≫sig⇒ ≫ #'(λ (x) body-module-) sig⇒ (pi-sig #'x A B))]
   [else
    #:with (_ . rst) this-syntax
    #'(core-lambda . rst)])
@@ -325,18 +325,18 @@
 
 (define-typed-syntax mod-lang-#%app
   ;; as a module
-  [⊢≫sig⇒
-     [G ⊢ #'(_ fun ~! arg:module-path)]
+  [⊢m≫sig⇒
+     [G ⊢m #'(_ fun ~! arg:module-path)]
      ;; TODO: allow arg to be arbitrary module expression
      ;;   ... may require figuring out how to solve let vs. submodule ?
-     (ec G ⊢ #'fun ≫ #'fun- sig⇒ (pi-sig x A B))
-     (ec G ⊢ #'arg ≫ #'arg- sig⇒ A*)
+     (ec G ⊢m #'fun ≫ #'fun- sig⇒ (pi-sig x A B))
+     (ec G ⊢m #'arg ≫ #'arg- sig⇒ A*)
      (unless (signature-matches? G A* A)
        (raise-syntax-error #f
          (format "signature mismatch\n  expected: ~v\n  given:    ~v" A A*)
          #'arg))
      (define B* (signature-subst B x (attribute arg.path)))
-     (er ⊢≫sig⇒ ≫ #'(fun- arg-)
+     (er ⊢m≫sig⇒ ≫ #'(fun- arg-)
          sig⇒ B*)]
 
   [else
@@ -348,8 +348,8 @@
 (define-typed-syntax mod-lang-where
   #:datum-literals [=]
   ;; as a signature (only use)
-  [⊢≫signature⇐
-   [G ⊢ #'(_ base-sig:id type-id:id = τ-stx:expr)]
+  [⊢s≫signature⇐
+   [G ⊢s #'(_ base-sig:id type-id:id = τ-stx:expr)]
    (define base (expand-signature G #'base-sig))
    (define sym (syntax-e #'type-id))
    (define τ (expand-type/dke (env->decl-kind-env G) #'τ-stx))

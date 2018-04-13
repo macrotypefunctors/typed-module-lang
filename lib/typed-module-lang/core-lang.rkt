@@ -44,14 +44,14 @@
 ;; ----------------------------------------------------
 
 (define-for-syntax (prim-type-transformer t)
-  (id-transformer (cases [⊢≫type⇐ [dke ⊢ _] (type-stx t)])))
+  (id-transformer (cases [⊢τ≫type⇐ [dke ⊢τ _] (type-stx t)])))
 
 (define-syntax Int (prim-type-transformer (Int)))
 (define-syntax Bool (prim-type-transformer (Bool)))
 
 (define-typed-syntax ->
-  [⊢≫type⇐
-   [dke ⊢ #'(-> in* ... out*)]
+  [⊢τ≫type⇐
+   [dke ⊢τ #'(-> in* ... out*)]
    (define (expand-type t) (expand-type/dke dke t))
    (define ins (map expand-type (attribute in*)))
    (define out (expand-type #'out*))
@@ -133,7 +133,7 @@
    ; e can only be typechecked in *this* G
    [G ⊢ #'(_ x : τ-stx = e:expr)]
    (define τ (expand-type #'τ-stx)) ;; don't need to use env because already expanded
-   (ec G ⊢ #'e ≫ #'e- ⇐ τ)
+   (ec G ⊢e #'e ≫ #'e- ⇐ τ)
    (er ⊢≫val-def⇐ ≫ #`(define x e-))])
 
 (define-typed-syntax type
@@ -178,8 +178,8 @@
    #:with msg (format "~a = ~a"
                       (prettify/#%dot (syntax->datum #'e1))
                       (prettify/#%dot (syntax->datum #'e2)))
-   (ec G ⊢ #'e1 ≫ #'e1- ⇒ τ)
-   (ec G ⊢ #'e2 ≫ #'e2- ⇐ τ)
+   (ec G ⊢e #'e1 ≫ #'e1- ⇒ τ)
+   (ec G ⊢e #'e2 ≫ #'e2- ⇐ τ)
    (er ⊢≫val-def⇐ ≫ #'(check-equal? e1- e2- 'msg))])
 
 ;; ----------------------------------------------------
@@ -196,24 +196,24 @@
 
 (define-typed-syntax #%var
   ;; as an expression
-  [⊢≫⇒
-   [G ⊢ #'(_ x:id)]
+  [⊢e≫⇒
+   [G ⊢e #'(_ x:id)]
    (match (env-lookup-val G #'x)
      [#f (raise-syntax-error #f "cannot use type as term" #'x)]
-     [τ (er ⊢≫⇒ ≫ #'x ⇒ τ)])]
+     [τ (er ⊢e≫⇒ ≫ #'x ⇒ τ)])]
   ;; as a type
-  [⊢≫type⇐
-   [dke ⊢ #'(_ x:id)]
+  [⊢τ≫type⇐
+   [dke ⊢τ #'(_ x:id)]
    ;; don't return er, return type-stx with a *type struct* instead
    (type-stx (named-reference #'x))])
 
 (define-typed-syntax core-lang-datum
-  [⊢≫⇒
-   [G ⊢ #'(_ . i:exact-integer)]
-   (er ⊢≫⇒ ≫ #''i ⇒ (Int))]
-  [⊢≫⇒
-   [G ⊢ #'(_ . {~and b {~or #t #f}})]
-   (er ⊢≫⇒ ≫ #''b ⇒ (Bool))])
+  [⊢e≫⇒
+   [G ⊢e #'(_ . i:exact-integer)]
+   (er ⊢e≫⇒ ≫ #''i ⇒ (Int))]
+  [⊢e≫⇒
+   [G ⊢e #'(_ . {~and b {~or #t #f}})]
+   (er ⊢e≫⇒ ≫ #''b ⇒ (Bool))])
 
 (begin-for-syntax
   ;; traverses type aliases until an Arrow type is found.
@@ -228,16 +228,16 @@
       [_ #f])))
 
 (define-typed-syntax core-lang-lambda
-  [⊢≫⇐
-   [G ⊢ #'(_ (x:id ...) body:expr) ⇐ τ_expected]
+  [⊢e≫⇐
+   [G ⊢e #'(_ (x:id ...) body:expr) ⇐ τ_expected]
    (match-define (Arrow τ_as τ_b) (find-arrow-type G τ_expected))
    (define body-G
      (append (map list (attribute x) (map val-binding τ_as))
              G))
-   (ec body-G ⊢ #'body ≫ #'body- ⇐ τ_b)
-   (er ⊢≫⇐ ≫ #`(lambda (x ...) body-))]
-  [⊢≫⇒
-   [G ⊢ #'(_ ([x:id : τ-stx] ...) body:expr)]
+   (ec body-G ⊢e #'body ≫ #'body- ⇐ τ_b)
+   (er ⊢e≫⇐ ≫ #`(lambda (x ...) body-))]
+  [⊢e≫⇒
+   [G ⊢e #'(_ ([x:id : τ-stx] ...) body:expr)]
    (define dke (env->decl-kind-env G))
 
    (define (expand-type τ-stx)
@@ -247,16 +247,16 @@
    (define body-G
      (append (map list (attribute x) (map val-binding τ_xs))
              G))
-   (ec body-G ⊢ #'body ≫ #'body- ⇒ τ_body)
-   (er ⊢≫⇒ ≫ #`(lambda (x ...) body-) ⇒ (Arrow τ_xs τ_body))])
+   (ec body-G ⊢e #'body ≫ #'body- ⇒ τ_body)
+   (er ⊢e≫⇒ ≫ #`(lambda (x ...) body-) ⇒ (Arrow τ_xs τ_body))])
 
 (define-typed-syntax core-lang-app
   ;; as an expression. no type application thus far,
   ;; but the module layer will need to override #%app
   ;; for functor application.
-  [⊢≫⇒
-   [G ⊢ #'(_ fn:expr arg:expr ...)]
-   (ec G ⊢ #'fn ≫ #'fn- ⇒ τ-fn)
+  [⊢e≫⇒
+   [G ⊢e #'(_ fn:expr arg:expr ...)]
+   (ec G ⊢e #'fn ≫ #'fn- ⇒ τ-fn)
    ;; extract function type
    (define-values [τ-ins τ-out]
      (match (find-arrow-type G τ-fn)
@@ -275,47 +275,47 @@
    (define/syntax-parse (arg- ...)
      (for/list ([τ (in-list τ-ins)]
                 [e (in-list (attribute arg))])
-       (ec G ⊢ e ≫ e- ⇐ τ)
+       (ec G ⊢e e ≫ e- ⇐ τ)
        e-))
-   (er ⊢≫⇒ ≫ #`(#%app fn- arg- ...) ⇒ τ-out)])
+   (er ⊢e≫⇒ ≫ #`(#%app fn- arg- ...) ⇒ τ-out)])
 
 (define-typed-syntax core-lang-let
-  [⊢≫⇒
-   [G ⊢ #'(_ ([x:id e:expr] ...) body:expr)]
+  [⊢e≫⇒
+   [G ⊢e #'(_ ([x:id e:expr] ...) body:expr)]
    #:do [(define-values [es- τ_xs]
            (for/lists (es- τ_xs)
                       ([e (in-list (attribute e))])
-             (ec G ⊢ e ≫ e- ⇒ τ_e)
+             (ec G ⊢e e ≫ e- ⇒ τ_e)
              (values e- τ_e)))]
    #:with [e- ...] es-
    (define body-G
      (append (map list (attribute x) (map val-binding τ_xs))
              G))
-   (ec body-G ⊢ #'body ≫ #'body- ⇒ τ_b)
-   (er ⊢≫⇒ ≫ #`(let ([x e-] ...) body-) ⇒ τ_b)])
+   (ec body-G ⊢e #'body ≫ #'body- ⇒ τ_b)
+   (er ⊢e≫⇒ ≫ #`(let ([x e-] ...) body-) ⇒ τ_b)])
 
 (define-typed-syntax core-lang-if
-  [⊢≫⇐
-   [G ⊢ #'(_ que thn els) ⇐ τ]
-   (ec G ⊢ #'que ≫ #'que- ⇐ (Bool))
-   (ec G ⊢ #'thn ≫ #'thn- ⇐ τ)
-   (ec G ⊢ #'els ≫ #'els- ⇐ τ)
-   (er ⊢≫⇐ ≫ #'(if que- thn- els-))]
-  [⊢≫⇒
-   [G ⊢ #'(_ que thn els)]
-   (ec G ⊢ #'que ≫ #'que- ⇐ (Bool))
-   (ec G ⊢ #'thn ≫ #'thn- ⇒ τ)
-   (ec G ⊢ #'els ≫ #'els- ⇐ τ)
-   (er ⊢≫⇒ ≫ #'(if que- thn- els-) ⇒ τ)])
+  [⊢e≫⇐
+   [G ⊢e #'(_ que thn els) ⇐ τ]
+   (ec G ⊢e #'que ≫ #'que- ⇐ (Bool))
+   (ec G ⊢e #'thn ≫ #'thn- ⇐ τ)
+   (ec G ⊢e #'els ≫ #'els- ⇐ τ)
+   (er ⊢e≫⇐ ≫ #'(if que- thn- els-))]
+  [⊢e≫⇒
+   [G ⊢e #'(_ que thn els)]
+   (ec G ⊢e #'que ≫ #'que- ⇐ (Bool))
+   (ec G ⊢e #'thn ≫ #'thn- ⇒ τ)
+   (ec G ⊢e #'els ≫ #'els- ⇐ τ)
+   (er ⊢e≫⇒ ≫ #'(if que- thn- els-) ⇒ τ)])
 
 ;; ---------------------------------------------------------
 
 (define-for-syntax (typed-prim-transformer internal type)
   (var-like-transformer
    (cases
-    [⊢≫⇒
-     [G ⊢ _]
-     (er ⊢≫⇒ ≫ internal ⇒ type)])))
+    [⊢e≫⇒
+     [G ⊢e _]
+     (er ⊢e≫⇒ ≫ internal ⇒ type)])))
 
 (define-syntax define-typed-prim
   (syntax-parser

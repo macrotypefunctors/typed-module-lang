@@ -32,6 +32,7 @@
                      racket/match
                      racket/pretty
                      racket/syntax
+                     unstable/match
                      macrotypes-nonstx/type-prop
                      (only-in syntax/parse [attribute @])
                      "type-check.rkt"
@@ -86,46 +87,6 @@
 
 ;; --------------------------------------------------------------
 
-;; Converting internal type environments to "external" signatures
-
-(begin-for-syntax
-  ;; Env -> Sig
-  (define (module-env->sig module-G)
-    (define type/mod-ids
-      (for/list ([entry (in-list module-G)]
-                 #:when (or (type-binding? (second entry))
-                            (mod-binding? (second entry))))
-        (first entry)))
-
-    (define type/mod-id-syms
-      (map list type/mod-ids (map syntax-e type/mod-ids)))
-
-    (define (resolve-ids τ)
-      (named-reference-map
-       (λ (x)
-         (match (and (identifier? x)
-                     (assoc x type/mod-id-syms free-identifier=?))
-           [#f x]
-           [(list _ sym) sym]))
-       τ))
-
-    (for/hash ([p (in-list module-G)])
-      (match-define (list id binding) p)
-      (define decl
-        (match binding
-          [(val-binding τ) (val-decl (resolve-ids τ))]
-          [(type-binding decl)
-           (match decl
-             [(type-alias-decl τ) (type-alias-decl (resolve-ids τ))]
-             [(type-opaque-decl) decl])]
-
-          [(mod-binding sig)
-           (mod-decl (resolve-ids sig))]))
-      ;; convert identifiers into symbols for the signature
-      (values (syntax-e id) decl))))
-
-;; --------------------------------------------------------------
-
 (define-typed-syntax #%var
   ;; as a module
   [⊢m≫sig⇒
@@ -163,10 +124,8 @@
    (ec G ⊢m #'m ≫ #'m- sig⇒ s)
    (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
    (define τ_x
-     (match (sig-ref s (syntax-e #'x))
-       [(val-decl τ)
-        (define qenv (extend-qual-env (hash) s (attribute m.path)))
-        (qualify-type qenv τ)]
+     (match (mod-path-lookup G (attribute m.path) (syntax-e #'x))
+       [(val-decl τ) τ]
        [_ (raise-syntax-error #f "not a value binding" #'x)]))
    (er ⊢e≫⇒ ≫ #'(hash-ref m- 'x) ⇒ τ_x)]
 
@@ -177,7 +136,7 @@
    (ec G ⊢m #'m ≫ _ sig⇒ s)
    (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
    (define comp (sig-ref s (syntax-e #'x)))
-   (unless (or (type-alias-decl? comp) (type-opaque-decl? comp))
+   (unless (match? comp (sig-component _ (or (type-alias-decl _) (type-opaque-decl))))
      (raise-syntax-error #f "not a type binding" #'x))
    (type-stx (dot (attribute m.path) (syntax-e #'x)))]
 
@@ -187,10 +146,8 @@
    (ec G ⊢m #'m ≫ #'m- sig⇒ s)
    (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
    (define s_x
-     (match (sig-ref s (syntax-e #'x))
-       [(mod-decl m-sig)
-        (define qenv (extend-qual-env (hash) s (attribute m.path)))
-        (qualify-sig qenv m-sig)]
+     (match (mod-path-lookup G (attribute m.path) (syntax-e #'x))
+       [(mod-decl m-sig) m-sig]
        [_ (raise-syntax-error #f "not a submodule" #'x)]))
 
    (er ⊢m≫sig⇒ ≫ #'(hash-ref m- 'x)

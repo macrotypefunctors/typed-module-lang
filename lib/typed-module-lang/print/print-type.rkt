@@ -4,6 +4,7 @@
          sig->string)
 
 (require racket/pretty
+         syntax/id-table
          "../type.rkt"
          "../sig.rkt")
 
@@ -14,10 +15,12 @@
 ;; ---------------------------------------------------------
 
 (define (type->string τ)
-  (pretty-format (->s-expr τ) #:mode 'write))
+  (define env (make-immutable-free-id-table))
+  (pretty-format (->s-expr env τ) #:mode 'write))
 
 (define (sig->string τ)
-  (pretty-format (->s-expr τ) #:mode 'write))
+  (define env (make-immutable-free-id-table))
+  (pretty-format (->s-expr env τ) #:mode 'write))
 
 ;; ---------------------------------------------------------
 
@@ -32,38 +35,45 @@
      (match-define (*dot m x) self)
      (fprintf out "~s.~s" m x))])
 
-(define (->s-expr τ)
-  (->s-expr/recur τ ->s-expr))
+;; ---------------------------------------------------------
 
-(define (->s-expr/recur τ rec)
+;; An Env is a [FreeIdTableOf Symbol]
+;; maps identifiers to their *external*-ly seen names
+
+(define (->s-expr env τ)
+  (->s-expr/recur env τ ->s-expr))
+
+(define (->s-expr/recur env τ rec)
+  (define (rc τ) (rec env τ))
   (match τ
     ;; generic things, both types and module paths
-    [(named-reference x)
-     (cond [(identifier? x) (syntax-e x)]
-           [(symbol? x) x]
-           [else (unconvertable τ)])]
-    [(dot path x)
-     (cond [(symbol? x) (*dot (rec path) x)]
-           [else (unconvertable τ)])]
+    [(named-reference (? identifier? x))
+     (free-id-table-ref env x (λ () (syntax-e x)))]
+    [(dot path (? symbol? x))
+     (*dot (rc path) x)]
     ;; types
     [(Int) 'Int]
     [(Bool) 'Bool]
     [(Arrow ins out)
-     `(-> ,@(map rec ins) ,(rec out))]
+     `(-> ,@(map rc ins) ,(rc out))]
     ;; signatures
     [(? sig? s)
+     (define env*
+       (for/fold ([env* env]) ([(k v) (in-hash s)])
+         (match-define (sig-component id _) v)
+         (free-id-table-set env* id k)))
      `(sig
        ,@(for/list ([(k v) (in-hash s)])
-           (match v
-             [(val-decl τ)        `(val ,k : ,(rec τ))]
+           (match-define (sig-component _ entry) v)
+           (match entry
+             [(val-decl τ)        `(val ,k : ,(rec env* τ))]
              [(type-opaque-decl)  `(type ,k)]
-             [(type-alias-decl τ) `(type ,k = ,(rec τ))]
-             [(mod-decl sub)      `(define-module ,k : ,(rec sub))])))]
-    [(pi-sig x A B)
-     (cond [(identifier? x)
-            `(Π ([,(syntax-e x) : ,(rec A)]) ,(rec B))]
-           [else
-            (unconvertable τ)])]
+             [(type-alias-decl τ) `(type ,k = ,(rec env* τ))]
+             [(mod-decl sub)      `(define-module ,k : ,(rec env* sub))])))]
+    [(pi-sig (? identifier? x) A B)
+     (define env*
+       (free-id-table-set env x (syntax-e x)))
+     `(Π ([,(syntax-e x) : ,(rc A)]) ,(rec env* B))]
     ;; else
     [_
      (unconvertable τ)]))

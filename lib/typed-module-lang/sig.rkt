@@ -1,7 +1,17 @@
 #lang racket/base
 (require racket/match
          racket/bool
-         "type.rkt")
+         racket/list
+         racket/syntax
+         syntax/id-table
+         "type.rkt"
+         "util/for-id-table.rkt")
+(module+ test
+  (require rackunit
+           racket/function
+           syntax/parse/define
+           (for-syntax racket/base
+                       racket/syntax)))
 
 ;; ---------------------------------------------------------
 
@@ -24,14 +34,19 @@
 
 ;; ---------------------------------------------------------
 
-(provide type-opaque-decl type-opaque-decl?
+(provide sig-component sig-component?
+         type-opaque-decl type-opaque-decl?
          val-decl val-decl?
          mod-decl mod-decl?)
 
 ;; A Sig is represented with a
 ;;   (Hashof Symbol SigComponent)
 
-;; A SigComponent is one of:
+;; A SigComponent is a
+;;   (sig-component Id SigEntry)
+(struct sig-component [id entry] #:prefab)
+
+;; A SigEntry is one of:
 ;;  - (type-alias-decl Type)
 ;;  - (type-opaque-decl)
 ;;  - (val-decl Type)
@@ -78,11 +93,17 @@
      (dot (tnr-f M) x)]
     [(? sig? s)
      (for/hash ([(k v) (in-hash s)])
-       (values k (match v
-                   [(val-decl τ) (val-decl (tnr-f τ))]
-                   [(type-opaque-decl) (type-opaque-decl)]
-                   [(type-alias-decl τ) (type-alias-decl (tnr-f τ))]
-                   [(mod-decl s) (mod-decl (tnr-f s))])))]
+       (values k
+               (match v
+                 [(sig-component x entry)
+                  ;; TODO: do some capture-avoiding?
+                  (sig-component
+                   x
+                   (match entry
+                     [(val-decl τ) (val-decl (tnr-f τ))]
+                     [(type-opaque-decl) (type-opaque-decl)]
+                     [(type-alias-decl τ) (type-alias-decl (tnr-f τ))]
+                     [(mod-decl s) (mod-decl (tnr-f s))]))])))]
     [(pi-sig x A B)
      ;; TODO: scope stuff for x? This function is used for identifier
      ;;       substitution, so it should respect scope somehow. When `x`
@@ -149,7 +170,8 @@
                sym
     (λ (prev-decl)
       (match prev-decl
-        [(type-opaque-decl) (type-alias-decl type)]
+        [(sig-component id (type-opaque-decl))
+         (sig-component id (type-alias-decl type))]
         [_ (error "can't `where` a non-opaque declaration")]))
     (λ ()
       (error "can't `where` a non-existent declaration"))))
@@ -204,44 +226,82 @@
 
 ;; Env Sig Sig -> Bool
 (define (sig-matches? env A B)
+  ;; A-id->common : [FreeIdTableof CommonId]
+  ;; B-id->common : [FreeIdTableof CommonId]
+  ;; where CommonId is an identifier to be bound in the extended
+  ;; common env
+  ;; sym->id : [Hashof Sym CommonId]
+  (define sym->id
+    (let* ([acc (hash)]
+           [acc (for/fold ([acc acc]) ([k (in-hash-keys A)]
+                                       #:when (not (hash-has-key? acc k)))
+                  (hash-set acc k (generate-temporary k)))]
+           [acc (for/fold ([acc acc]) ([k (in-hash-keys B)]
+                                       #:when (not (hash-has-key? acc k)))
+                  (hash-set acc k (generate-temporary k)))])
+      acc))
+  (define A-id->common
+    (for/free-id-table ([(k v) (in-hash A)])
+      (match-define (sig-component id entry) v)
+      (values id (hash-ref sym->id k))))
+  (define B-id->common
+    (for/free-id-table ([(k v) (in-hash B)])
+      (match-define (sig-component id entry) v)
+      (values id (hash-ref sym->id k))))
   ;; TODO: use this to convert both *defs* and *refs* for
   ;;       types in sigs
-  (define (sig-sym->id sym)
-    (datum->syntax #f sym))
-  (define (type-map-sym->id t)
-    (named-reference-map sig-sym->id t))
-  (define (sig-component-map-sym->id comp)
-    (match comp
-      [(type-alias-decl t) (type-alias-decl (type-map-sym->id t))]
-      [(type-opaque-decl) comp]
-      [(val-decl t) (val-decl (type-map-sym->id t))]))
+  (define (type-map-mod->common m->c t)
+    (named-reference-map (λ (x) (free-id-table-ref m->c x x)) t))
+  (define (sig-entry-map-mod->common m->c entry)
+    (match entry
+      ;; TODO: submodules
+      [(type-alias-decl t) (type-alias-decl (type-map-mod->common m->c t))]
+      [(type-opaque-decl) entry]
+      [(val-decl t) (val-decl (type-map-mod->common m->c t))]
+      [(mod-decl s) (mod-decl (signature-map-mod->common m->c s))]))
 
-  (define (sig-component->env-binding comp)
-    (match comp
-      [(val-decl t) (val-binding (type-map-sym->id t))]
-      [comp (type-binding (sig-component-map-sym->id comp))]))
+  (define (signature-map-mod->common m->c s)
+    (match s
+      [(? sig? s)
+       (for/hash ([(k v) (in-hash s)])
+         (match-define (sig-component x entry) v)
+         (values k (sig-component x (sig-entry-map-mod->common m->c entry))))]
+      [(pi-sig x A B)
+       (pi-sig x
+               (signature-map-mod->common m->c A)
+               (signature-map-mod->common m->c B))]))
 
-  ;; extend the env with all the components from B
+  (define (sig-entry->env-binding m->c entry)
+    (match entry
+      ;; TODO: submodules
+      [(val-decl t) (val-binding (type-map-mod->common m->c t))]
+      [comp (type-binding (sig-entry-map-mod->common m->c entry))]))
+
+  ;; extend the env with all the components from A
   ;; REMEMBER: the entries in this env are EnvBindings!
   ;;           refer to the definition of Env
   (define env*
     (for/fold ([env* env])
-              ([(A-x A-comp) (in-hash A)])
-      (cons (list (sig-sym->id A-x)
-                  (sig-component->env-binding A-comp))
+              ([(A-sym A-comp) (in-hash A)])
+      (match-define (sig-component _ A-entry) A-comp)
+      (cons (list (hash-ref sym->id A-sym)
+                  (sig-entry->env-binding A-id->common A-entry))
             env*)))
 
   ;; check that all components in B correspond with components in A
   (for/and ([(B-x B-comp) (in-hash B)])
     (define A-comp
-      (hash-ref A B-x #f))
+      (sig-ref A B-x))
     (and A-comp
-         (sig-component-matches? env*
-                                 (sig-component-map-sym->id A-comp)
-                                 (sig-component-map-sym->id B-comp)))))
+         (let ([A-entry (sig-component-entry A-comp)]
+               [B-entry (sig-component-entry B-comp)])
+           (sig-entry-matches?
+            env*
+            (sig-entry-map-mod->common A-id->common A-entry)
+            (sig-entry-map-mod->common B-id->common B-entry))))))
 
-;; Env SigComp SigComp -> Bool
-(define (sig-component-matches? env A B)
+;; Env SigEntry SigEntry -> Bool
+(define (sig-entry-matches? env A B)
   (match* [A B]
     [[(val-decl A) (val-decl B)]
      (type-matches? env A B)]
@@ -301,7 +361,8 @@
 
 (provide qualify-type
          qualify-sig
-         extend-qual-env)
+         extend-qual-env
+         mod-path-lookup)
 
 #|
 Interesting Examples:
@@ -344,54 +405,61 @@ M.L.T4 = (alias M.J.D)
      (values base (append xs (list x)))]))
 
 
-;; a QualEnv is a [Hashof Symbol ModPath]
+;; a QualEnv is a [FreeIdTableof TypePath]
+;; where a TypePath is a (dot ModPath Symbol)
 
 ;; QualEnv Sig ModPath -> QualEnv
+;; populates the `qenv` with an entry for everything in the
+;; `sig`
 (define (extend-qual-env qenv sig prefix)
   (for/fold ([qenv qenv])
-            ([(x comp) (in-hash sig)])
-    (match comp
+            ([(sym comp) (in-hash sig)])
+    (match-define (sig-component id entry) comp)
+    (match entry
       [(or (type-alias-decl _)
            (type-opaque-decl)
            (mod-decl _))
-       (hash-set qenv x prefix)]
+       (free-id-table-set qenv id (dot prefix sym))]
       [_ qenv])))
 
-;; Env ModPath Symbol -> SigComp or #f
-;; returns corresponding component whose types are
+;; Env ModPath Symbol -> SigEntry or #f
+;; returns corresponding sig entry whose types are
 ;; valid in the scope of 'env'.
 (define (mod-path-lookup env path y)
-  (define-values [base xs]
+  (define-values [base syms]
     (path->base+names path))
 
   (define sig
     (env-lookup-module env base))
 
   (let loop ([sig sig]
-             [xs xs]
-             ; qenv : QualEnv = [Hashof Symbol Path]
-             [qenv (hash)]
+             [syms syms]
+             ; qenv : QualEnv
+             [qenv (make-immutable-free-id-table)]
              ; prefix : ModPath
              [prefix (named-reference base)])
     (and
      (sig? sig)
      (let ([qenv* (extend-qual-env qenv sig prefix)])
-       (match xs
+       (match syms
          ['()
           (define comp (sig-ref sig y))
-          (and comp (qualify-component qenv* comp))]
+          (match comp
+            [(sig-component _ entry)
+             (qualify-sig-entry qenv* entry)]
+            [#f #f])]
 
          [(cons x xs*)
           (match (sig-ref sig x)
-            [(mod-decl sig*)
-             (define path* (dot path x))
-             (loop sig* xs* qenv* path*)]
+            [(sig-component _ (mod-decl sig*))
+             (define prefix* (dot prefix x))
+             (loop sig* xs* qenv* prefix*)]
             [_ #f])])))))
 
-;; QualEnv SigComp -> SigComp
-;; prefix all types & modules in 'comp' with prefixes in 'qenv'
-(define (qualify-component qenv comp)
-  (match comp
+;; QualEnv SigEntry -> SigEntry
+;; prefix all types & modules in 'entry' with prefixes in 'qenv'
+(define (qualify-sig-entry qenv entry)
+  (match entry
     [(val-decl ty)        (val-decl (qualify-type qenv ty))]
     [(type-alias-decl ty) (type-alias-decl (qualify-type qenv ty))]
     [(mod-decl sig)       (mod-decl (qualify-sig qenv sig))]
@@ -402,33 +470,66 @@ M.L.T4 = (alias M.J.D)
   (transform-named-reference
    type
    (λ (x)
-     (match (hash-ref qenv x #f)
+     (match (free-id-table-ref qenv x #f)
        [#f (named-reference x)]
-       [prefix (dot prefix x)]))))
+       [path path]))))
 
 (define (qualify-sig qenv sig)
   ;; TODO: avoid captures?
   (for/hash ([(x comp) (in-hash sig)])
-    (values x (qualify-component qenv comp))))
+    (match-define (sig-component id entry) comp)
+    (values x (sig-component id (qualify-sig-entry qenv entry)))))
+
+;; --------------------------------------------------------------
+
+;; Converting internal type environments to "external" signatures
+
+(provide module-env->sig)
+
+;; Env -> Sig
+(define (module-env->sig module-G)
+  (for/hash ([p (in-list module-G)])
+    (match-define (list id binding) p)
+    (define decl
+      (match binding
+        [(val-binding τ) (val-decl τ)]
+        [(type-binding decl)
+         (match decl
+           [(type-alias-decl τ) (type-alias-decl τ)]
+           [(type-opaque-decl) decl])]
+
+        [(mod-binding sig)
+         (mod-decl sig)]))
+    ;; convert identifiers into symbols for the outside names
+    ;; for the signature
+    (values (syntax-e id) (sig-component id decl))))
 
 ;; -----------------------------------------------------
 
 (module+ test
-  (require rackunit racket/function)
   (define-binary-check (check-sig-matches A B)
     (signature-matches? '() A B))
   (define-binary-check (check-not-sig-matches A B)
     (not (signature-matches? '() A B)))
 
-  (define sig hash)
+  (define-simple-macro (sig [x:id sig-entry:expr] ...)
+    #:with [x* ...] (generate-temporaries #'[x ...])
+    #:with [[k/v ...] ...] #'[['x (sig-component x sig-entry)] ...]
+    (let ([x (quote-syntax x*)] ...)
+      (hash k/v ... ...)))
+  (define-simple-macro (pi x:id A:expr B:expr)
+    #:with x* (generate-temporary #'x)
+    (let ([x (quote-syntax x*)]
+          [in A])
+      (pi-sig x in B)))
 
   (define empty (hash))
   (define sig-X=int
     (sig
-     'X (type-alias-decl (Int))))
+     [X (type-alias-decl (Int))]))
   (define sig-X-opaque
     (sig
-     'X (type-opaque-decl)))
+     [X (type-opaque-decl)]))
 
   (check-sig-matches empty empty)
   (check-sig-matches sig-X=int sig-X=int)
@@ -440,15 +541,15 @@ M.L.T4 = (alias M.J.D)
 
   (define sig-X/Y-x:X
     (sig
-     'X (type-opaque-decl)
-     'Y (type-alias-decl (named-reference 'X))
-     'x (val-decl (named-reference 'X))))
+     [X (type-opaque-decl)]
+     [Y (type-alias-decl (named-reference X))]
+     [x (val-decl (named-reference X))]))
 
   (define sig-X/Y-x:Y
     (sig
-     'X (type-opaque-decl)
-     'Y (type-opaque-decl)
-     'x (val-decl (named-reference 'Y))))
+     [X (type-opaque-decl)]
+     [Y (type-opaque-decl)]
+     [x (val-decl (named-reference Y))]))
 
   (check-sig-matches sig-X/Y-x:X sig-X/Y-x:Y)
   (check-not-sig-matches sig-X/Y-x:Y sig-X/Y-x:X)
@@ -456,56 +557,72 @@ M.L.T4 = (alias M.J.D)
 
   (define sig-X-Y=X
     (sig
-     'X (type-opaque-decl)
-     'Y (type-alias-decl (named-reference 'X))))
+     [X (type-opaque-decl)]
+     [Y (type-alias-decl (named-reference X))]))
 
   (define sig-Y-X=Y
     (sig
-     'Y (type-opaque-decl)
-     'X (type-alias-decl (named-reference 'Y))))
+     [Y (type-opaque-decl)]
+     [X (type-alias-decl (named-reference Y))]))
 
   (check-not-sig-matches sig-X-Y=X sig-Y-X=Y)
 
 
   (check-sig-matches
-   (sig 'v (val-decl (Int))
-        'X (type-alias-decl (Int))
-        'Y (type-alias-decl (Int)))
-   (sig 'v (val-decl (named-reference 'X))
-        'X (type-opaque-decl)
-        'Y (type-alias-decl (named-reference 'X))))
+   (sig [v (val-decl (Int))]
+        [X (type-alias-decl (Int))]
+        [Y (type-alias-decl (Int))])
+   (sig [v (val-decl (named-reference X))]
+        [X (type-opaque-decl)]
+        [Y (type-alias-decl (named-reference X))]))
 
   (check-sig-matches
-   (sig 'X (type-opaque-decl)
-        'Y (type-alias-decl (named-reference 'X)))
-   (sig 'Y (type-opaque-decl)))
+   (sig [X (type-opaque-decl)]
+        [Y (type-alias-decl (named-reference X))])
+   (sig [Y (type-opaque-decl)]))
 
-  (let ([x #'x]
-        [I  (sig 't (type-opaque-decl))]
-        [I* (sig 't (type-alias-decl (Int)))]
-        [J  (sig 's (type-opaque-decl) 't (type-opaque-decl))]
-        [J* (sig 's (type-opaque-decl) 't (type-alias-decl (named-reference 's)))])
+  ;; -------------------------
+  ;; submodules
+
+  (let ([M #'M])
+    (define env
+      (list
+       (list M (mod-binding (sig
+                             [Inner
+                              (mod-decl (sig [t (type-alias-decl (Int))]))])))))
+    (check-true
+     (type-matches? env
+                    (Int)
+                    (dot (dot (named-reference M) 'Inner) 't))))
+
+  ;; -------------------------
+  ;; pi sigs
+
+  (let ([I  (sig [t (type-opaque-decl)])]
+        [I* (sig [t (type-alias-decl (Int))])]
+        [J  (sig [s (type-opaque-decl)] [t (type-opaque-decl)])]
+        [J* (sig [s (type-opaque-decl)] [t (type-alias-decl (named-reference s))])])
     (check-sig-matches I* I)
     (check-sig-matches J* J)
 
     (check-sig-matches
-     (pi-sig x I (sig 'v (val-decl (dot (named-reference x) 't))))
-     (pi-sig x I* (sig 'v (val-decl (dot (named-reference x) 't)))))
+     (pi x I (sig [v (val-decl (dot (named-reference x) 't))]))
+     (pi x I* (sig [v (val-decl (dot (named-reference x) 't))])))
 
     (check-sig-matches
-     (pi-sig x I (sig 'v (val-decl (dot (named-reference x) 't))))
-     (pi-sig x I* (sig 'v (val-decl (Int)))))
+     (pi x I (sig [v (val-decl (dot (named-reference x) 't))]))
+     (pi x I* (sig [v (val-decl (Int))])))
 
     (check-sig-matches
-     (pi-sig x J (sig 'v (val-decl (dot (named-reference x) 't))))
-     (pi-sig x J* (sig 'v (val-decl (dot (named-reference x) 't)))))
+     (pi x J (sig [v (val-decl (dot (named-reference x) 't))]))
+     (pi x J* (sig [v (val-decl (dot (named-reference x) 't))])))
 
     (check-sig-matches
-     (pi-sig x J (sig 'v (val-decl (dot (named-reference x) 't))))
-     (pi-sig x J* (sig 'v (val-decl (dot (named-reference x) 's)))))
+     (pi x J (sig [v (val-decl (dot (named-reference x) 't))]))
+     (pi x J* (sig [v (val-decl (dot (named-reference x) 's))])))
 
     (check-not-sig-matches
-     (pi-sig x J (sig 'v (val-decl (dot (named-reference x) 't))))
-     (pi-sig x J* (sig 'v (val-decl (Int)))))
+     (pi x J (sig [v (val-decl (dot (named-reference x) 't))]))
+     (pi x J* (sig [v (val-decl (Int))])))
     )
   )

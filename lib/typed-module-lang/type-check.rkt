@@ -13,6 +13,7 @@
          macrotypes-nonstx/type-check
          "type.rkt"
          "sig.rkt"
+         "env/assoc.rkt"
          "print/print-type.rkt")
 
 ;; -------------------------------------------------------------------
@@ -63,7 +64,7 @@
   [≫ decl- decl⇒ intro-env]
   #:in-stx decl
   #:out-stx decl-
-  #:stop-ids (map first dke)
+  #:stop-ids (map first (env->assoc dke))
   #:bad-output (raise-syntax-error #f "expected a type or val declaration" decl))
 
 ;; expand value definitions and typecheck their RHS
@@ -87,7 +88,7 @@
   [≫ expr-]
   #:in-stx expr
   #:out-stx expr-
-  #:stop-ids (map first G)
+  #:stop-ids (map first (env->assoc G))
   #:bad-output (raise-syntax-error #f "expected a typed expression" expr))
 
 (define-expand-check-relation tc
@@ -98,7 +99,7 @@
   [≫ expr- ⇒ type]
   #:in-stx expr
   #:out-stx expr-
-  #:stop-ids (map first G)
+  #:stop-ids (map first (env->assoc G))
   #:bad-output (raise-syntax-error #f "expected a typed expression" expr)
   #:implicit-rule
   [⊢e≫⇐
@@ -123,7 +124,7 @@
   [≫ ty- type⇐]
   #:in-stx ty
   #:out-stx ty-
-  #:stop-ids (map first dke)
+  #:stop-ids (map first (env->assoc dke))
   #:bad-output (raise-syntax-error #f "expected a type" ty))
 
 ;; expand-type/dke : DeclKindEnv Stx -> Type
@@ -142,7 +143,7 @@
   [≫ module-expr- sig⇒ signature-expr]
   #:in-stx module-expr
   #:out-stx module-expr-
-  #:stop-ids (map first external-G)
+  #:stop-ids (map first (env->assoc external-G))
   #:bad-output
   (raise-syntax-error #f "expected a typed module expression" module-expr))
 
@@ -153,7 +154,7 @@
   [≫ signature-expr- signature⇐]
   #:in-stx signature-expr
   #:out-stx signature-expr-
-  #:stop-ids (map first external-G)
+  #:stop-ids (map first (env->assoc external-G))
   #:bad-output (raise-syntax-error #f "expected a signature" signature-expr))
 
 ;; Env Stx -> Signature

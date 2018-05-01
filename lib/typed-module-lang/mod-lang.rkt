@@ -39,6 +39,7 @@
                      "type-check.rkt"
                      "sig.rkt"
                      "type.rkt"
+                     "env/assoc.rkt"
                      "print/print-type.rkt"
                      "print/print-env.rkt"
                      "util/for-acc.rkt"))
@@ -49,30 +50,32 @@
 
 (begin-for-syntax
   ;; mod-body-tc-passes :
-  ;; Env [Listof Stx] -> (values [Listof Stx] Env)
+  ;; Env [Listof Stx] -> (values [Listof Stx] Bindings)
   (define (mod-body-tc-passes external-G ds)
     (define-values [module-bindings ds/0]
-      (for/list/acc ([G '()])
+      (for/list/acc ([Gl '()])
                     ([d (in-list ds)])
-        (define G+external (append G external-G))
-        (ec G+external ⊢md d ≫ d- submoddef⇒ G+)
-        (values (append G+ G)
+        (define G+external (extend external-G Gl))
+        (ec G+external ⊢md d ≫ d- submoddef⇒ Gl+)
+        (values (append Gl+ Gl)
                 d-)))
-    (define G+modules (append module-bindings external-G))
-    (define-values [ds/1234 module-env]
+    (define G+modules (extend external-G module-bindings))
+    (define-values [ds/1234 module-envl]
       (core-lang-tc-passes G+modules ds/0))
-    (values ds/1234 (append module-env module-bindings)))
+    (values ds/1234 (append module-envl module-bindings)))
 
   ;; mod-lang-sc-passes :
-  ;; [Listof Stx] -> (values [Listof Stx] Env)
+  ;; [Listof Stx] -> (values [Listof Stx] Bindings)
   (define (mod-lang-sc-passes ds)
-    (define-values [env ds/1]
-      (for/list/acc ([G '()])
+    (define external (empty-env))
+    (define-values [envl ds/1]
+      (for/list/acc ([Gl '()])
                     ([d (in-list ds)])
-        (ec G ⊢md d ≫ d- modsigdef⇒ G+)
-        (values (append G+ G)
+        (define G+external (extend external Gl))
+        (ec G+external ⊢md d ≫ d- modsigdef⇒ Gl+)
+        (values (append Gl+ Gl)
                 d-)))
-    (values ds/1 env)))
+    (values ds/1 envl)))
 
 ;; The module-begin form.
 ;; For now, expect a series of define-module forms
@@ -81,9 +84,9 @@
 (define-syntax mod-lang-module-begin
   (syntax-parser
     [(_ d:expr ...)
-     (define-values [ds- G]
+     (define-values [ds- bindings]
        (mod-lang-sc-passes (@ d)))
-     (print-env G)
+     (print-env bindings)
      #`(#%module-begin #,@ds-)]))
 
 ;; --------------------------------------------------------------
@@ -249,7 +252,7 @@
                    ([x (in-list (@ mod-name))]
                     [sig-stx (in-list (@ mod-sig))])
        (define sig (expand-signature G sig-stx))
-       (values (cons (list x (mod-binding sig)) G)
+       (values (extend G (list (list x (mod-binding sig))))
                sig)))
 
    (define dke
@@ -260,7 +263,7 @@
 
    (define dke+external-G
      ;; the things in the dke are "closer"
-     (append dke (env->decl-kind-env external-G)))
+     (extend (env->decl-kind-env external-G) dke))
 
    (define (expand-type type-stx)
      (expand-type/dke dke+external-G type-stx))
@@ -282,7 +285,7 @@
   [⊢s≫signature⇐
    [external-G ⊢s #'(_ ([x:id : A-stx]) B-stx)]
    (define A (expand-signature external-G #'A-stx))
-   (define body-G (cons (list #'x (mod-binding A)) external-G))
+   (define body-G (extend external-G (list (list #'x (mod-binding A)))))
    (define B (expand-signature body-G #'B-stx))
    (type-stx (pi-sig #'x A B))])
 
@@ -293,7 +296,7 @@
   [⊢m≫sig⇒
    [G ⊢m #'(_ ([x:id : A-stx]) body-module:expr)]
    (define A (expand-signature G #'A-stx))
-   (define body-G (cons (list #'x (mod-binding A)) G))
+   (define body-G (extend (list (list #'x (mod-binding A)))))
    (ec body-G ⊢m #'body-module ≫ #'body-module- sig⇒ B)
    (er ⊢m≫sig⇒ ≫ #'(λ (x) body-module-) sig⇒ (pi-sig #'x A B))]
   [else

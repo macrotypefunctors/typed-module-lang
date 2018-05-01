@@ -13,7 +13,7 @@
   (define rename-env
     (for/free-id-table ([entry (in-list G)])
       (values (first entry) (syntax-e (first entry)))))
-  (for ([entry (in-list G)])
+  (for ([entry (in-list (reverse G))])
     (pretty-write
      (convert rename-env entry)
      out)))

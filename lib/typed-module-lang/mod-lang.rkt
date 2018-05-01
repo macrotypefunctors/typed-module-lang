@@ -10,6 +10,7 @@
                      [mod-lang-#%app #%app]
                      [mod-lang-where where]
                      [core-let let])
+         module
          define-module
          mod
          seal
@@ -228,30 +229,49 @@
        ≫ #'m-
        sig⇒ s-expected)])
 
+(define-syntax module
+  (λ (stx)
+    (raise-syntax-error #f "`module` only valid in sig syntax" stx)))
+
 (define-typed-syntax sig
-  #:literals [val type]
+  #:literals [val type module]
   #:datum-literals [: =]
   [⊢s≫signature⇐
-   [external-G ⊢s #'(_ {~alt (val val-name : val-type)
+   [external-G ⊢s #'(_ {~alt (module mod-name : mod-sig)
+                             (val val-name : val-type)
                              (type alias-name = alias-type)
-                             (type opaque-name)}
+                             (type opaque-name)
+                             }
                        ...)]
 
-   (define dke (map (λ (x) (list x 'type))
-                    (append (@ alias-name) (@ opaque-name))))
-   (define dke+external
+   (define-values [G+modules sigs]
+     (for/list/acc ([G external-G])
+                   ([x (in-list (@ mod-name))]
+                    [sig-stx (in-list (@ mod-sig))])
+       (define sig (expand-signature G sig-stx))
+       (values (cons (list x (mod-binding sig)) G)
+               sig)))
+
+   (define dke
+     ;; TODO: check for duplicate identifiers
+     (append (map (λ (x s) (list x (mod-binding s))) (@ mod-name) sigs)
+             (map (λ (x) (list x 'type)) (@ alias-name))
+             (map (λ (x) (list x 'type)) (@ opaque-name))))
+
+   (define dke+external-G
      ;; the things in the dke are "closer"
      (append dke (env->decl-kind-env external-G)))
 
    (define (expand-type type-stx)
-     (expand-type/dke dke+external type-stx))
+     (expand-type/dke dke+external-G type-stx))
 
-   (define val-τs (map expand-type (@ val-type)))
+   (define val-τs   (map expand-type (@ val-type)))
    (define alias-τs (map expand-type (@ alias-type)))
 
    (type-stx
     (module-env->sig
-     (append (map list (@ val-name) (map val-binding val-τs))
+     (append (map list (@ mod-name) (map mod-binding sigs))
+             (map list (@ val-name) (map val-binding val-τs))
              (map list (@ alias-name) (map (compose type-binding type-alias-decl) alias-τs))
              (map list (@ opaque-name) (map (const (type-binding (type-opaque-decl))) (@ opaque-name))))))])
 

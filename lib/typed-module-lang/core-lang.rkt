@@ -103,9 +103,9 @@
 (define-syntax core-lang-module-begin
   (syntax-parser
     [(_ d:expr ...)
-     (define-values [ds- G]
-       (core-lang-tc-passes '() (attribute d)))
-     (print-env G)
+     (define-values [ds- Gl]
+       (core-lang-tc-passes (empty-env) (attribute d)))
+     (print-env Gl)
      #`(#%module-begin #,@ds-)]))
 
 ;; ----------------------------------------------------
@@ -235,8 +235,8 @@
    [G ⊢e #'(_ (x:id ...) body:expr) ⇐ τ_expected]
    (match-define (Arrow τ_as τ_b) (find-arrow-type G τ_expected))
    (define body-G
-     (append (map list (attribute x) (map val-binding τ_as))
-             G))
+     (extend G
+             (map list (attribute x) (map val-binding τ_as))))
    (ec body-G ⊢e #'body ≫ #'body- ⇐ τ_b)
    (er ⊢e≫⇐ ≫ #`(lambda (x ...) body-))]
   [⊢e≫⇒
@@ -248,8 +248,8 @@
 
    (define τ_xs (map expand-type (attribute τ-stx)))
    (define body-G
-     (append (map list (attribute x) (map val-binding τ_xs))
-             G))
+     (extend G
+             (map list (attribute x) (map val-binding τ_xs))))
    (ec body-G ⊢e #'body ≫ #'body- ⇒ τ_body)
    (er ⊢e≫⇒ ≫ #`(lambda (x ...) body-) ⇒ (Arrow τ_xs τ_body))])
 
@@ -292,8 +292,8 @@
              (values e- τ_e)))]
    #:with [e- ...] es-
    (define body-G
-     (append (map list (attribute x) (map val-binding τ_xs))
-             G))
+     (extend G
+             (map list (attribute x) (map val-binding τ_xs))))
    (ec body-G ⊢e #'body ≫ #'body- ⇒ τ_b)
    (er ⊢e≫⇒ ≫ #`(let ([x e-] ...) body-) ⇒ τ_b)])
 

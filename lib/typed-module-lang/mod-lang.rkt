@@ -136,7 +136,9 @@
   ;; as a type
   [⊢τ≫type⇐
    [dke ⊢τ #'(_ m:module-path x:id)]
-   (define G (filter (compose mod-binding? second) dke))
+   (define G
+     (extend (empty-env)
+             (filter (compose mod-binding? second) (env->assoc dke))))
    (ec G ⊢m #'m ≫ _ sig⇒ s)
    (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
    (define comp (sig-ref s (syntax-e #'x)))
@@ -296,7 +298,7 @@
   [⊢m≫sig⇒
    [G ⊢m #'(_ ([x:id : A-stx]) body-module:expr)]
    (define A (expand-signature G #'A-stx))
-   (define body-G (extend (list (list #'x (mod-binding A)))))
+   (define body-G (extend G (list (list #'x (mod-binding A)))))
    (ec body-G ⊢m #'body-module ≫ #'body-module- sig⇒ B)
    (er ⊢m≫sig⇒ ≫ #'(λ (x) body-module-) sig⇒ (pi-sig #'x A B))]
   [else

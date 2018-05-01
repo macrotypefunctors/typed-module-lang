@@ -198,12 +198,12 @@
    ;; the module-sig should definitely *not*
    ;; include bindings from the external-G
    #:with name (generate-temporary 'mod)
-   #:do [(define-values [ds- module-env]
+   #:do [(define-values [ds- module-bindings]
            (mod-body-tc-passes external-G (@ d)))
          ;; TODO: include the type-env too
          ;; TODO: determine if the above comment is still relevant?
-         (define module-sig (module-env->sig module-env))]
-   #:with [x ...] (for/list ([entry (in-list module-env)]
+         (define module-sig (module-bindings->sig module-bindings))]
+   #:with [x ...] (for/list ([entry (in-list module-bindings)]
                              #:when (or (val-binding? (second entry))
                                         (mod-binding? (second entry))))
                     (first entry))
@@ -269,7 +269,7 @@
    (define alias-τs (map expand-type (@ alias-type)))
 
    (type-stx
-    (module-env->sig
+    (module-bindings->sig
      (append (map list (@ mod-name) (map mod-binding sigs))
              (map list (@ val-name) (map val-binding val-τs))
              (map list (@ alias-name) (map (compose type-binding type-alias-decl) alias-τs))

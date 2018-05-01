@@ -1,6 +1,8 @@
 #lang racket
 (provide (all-defined-out))
 
+(require "env/assoc.rkt")
+
 ;; TODO: yes the below definitions look exactly like the
 ;;  definitions in "sig.rkt"; we should modify "sig.rkt" to
 ;;  use these definitions instead and just add a few new
@@ -21,11 +23,9 @@
   ;       newtype =/= type alias !
   #:prefab)
 
-;; a DeclKindEnv is a [Listof [List Id DeclKind]]
-;;   - 'type
-;;   - 'val
+;; a DeclKindEnv is a [Envof DeclKind]
 
-;; a Env is a [Listof [List Id EnvBinding]]
+;; a Env is a [Envof EnvBinding]
 ;; an EnvBinding is one of
 ;;   - (val-binding Type)
 ;;   - (type-binding TypeDecl)
@@ -35,25 +35,28 @@
 
 ;; Env Id -> TypeDecl or #f
 (define (env-lookup-type-decl G X)
-  (match (assoc X G free-identifier=?)
-    [(list _ (type-binding td)) td]
+  (match (lookup G X)
+    [(type-binding td) td]
     [_ #f]))
 
 ;; Env Id -> Type or #f
 (define (env-lookup-val G x)
-  (match (assoc x G free-identifier=?)
-    [(list _ (val-binding τ)) τ]
+  (match (lookup G x)
+    [(val-binding τ) τ]
     [_ #f]))
 
 ;; Env -> DeclKindEnv
 ;; if it encounters a kind of binding that isn't val/type,
 ;; then it passes it through
 (define (env->decl-kind-env G)
-  (for/list ([entry (in-list G)])
-    (match entry
-      [(list x (val-binding _)) (list x 'val)]
-      [(list x (type-binding _)) (list x 'type)]
-      [_ entry])))
+  (extend
+   (empty-env)
+   (for/list ([entry (in-list (env->assoc G))])
+     (match entry
+       [(list x (val-binding _)) (list x 'val)]
+       [(list x (type-binding _)) (list x 'type)]
+       [_ entry]))))
+
 
 ;; ------------------------------------------------------
 

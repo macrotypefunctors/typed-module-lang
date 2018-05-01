@@ -38,6 +38,7 @@
                      macrotypes-nonstx/id-transformer
                      "type-check.rkt"
                      "type.rkt"
+                     "env/assoc.rkt"
                      "print/print-type.rkt"
                      "print/print-env.rkt"
                      "util/for-acc.rkt"
@@ -65,39 +66,39 @@
 
 (begin-for-syntax
   ;; core-lang-tc-passes :
-  ;; Env [Listof Stx] -> (values [Listof Stx] Env)
-  ;; the env returned is *not* an extension of external-G, it
+  ;; Env [Listof Stx] -> (values [Listof Stx] Bindings)
+  ;; the envl returned is *not* an extension of external-G, it
   ;; is collection of new bindings introduced by the declarations.
   (define (core-lang-tc-passes external-G ds)
     ;; pass 1
-    (define-values [dke ds/1]
-      (for/list/acc ([dke '()])
+    (define-values [dkel ds/1]
+      (for/list/acc ([dkel '()])
                     ([d (in-list ds)])
-        (ec ⊢ d ≫ d- decl-kinds⇒ dke+)
-        (values (append dke+ dke)
+        (ec ⊢ d ≫ d- decl-kinds⇒ dkel+)
+        (values (append dkel+ dkel)
                 d-)))
     (define dke+external
-      ;; note: important that 'dke' entries are "closer"
+      ;; note: important that 'dkel' entries are "closer"
       ;;   than entries in 'external-G'
-      (append dke (env->decl-kind-env external-G)))
+      (extend (env->decl-kind-env external-G) dkel))
     ;; pass 2
-    (define-values [env ds/2]
-      (for/list/acc ([G '()])
+    (define-values [envl ds/2]
+      (for/list/acc ([Gl '()])
                     ([d (in-list ds/1)])
-        (ec dke+external ⊢ d ≫ d- decl⇒ G+)
-        (values (append G+ G)
+        (ec dke+external ⊢ d ≫ d- decl⇒ Gl+)
+        (values (append Gl+ Gl)
                 d-)))
     (define env+external
-      ;; note: important that 'env' entries are "closer"
+      ;; note: important that 'envl' entries are "closer"
       ;;   than entries in 'external-G'
-      (append env external-G))
+      (extend external-G envl))
     ;; pass 3
     (define ds/3
       (for/list ([d (in-list ds/2)])
         (ec env+external ⊢ d ≫ d- val-def⇐)
         d-))
-    ; note: return just 'env', not 'env+external' (see purpose statement)
-    (values ds/3 env)))
+    ; note: return just 'envl', not 'env+external' (see purpose statement)
+    (values ds/3 envl)))
 
 (define-syntax core-lang-module-begin
   (syntax-parser

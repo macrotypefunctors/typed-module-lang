@@ -5,6 +5,7 @@
          racket/syntax
          syntax/id-table
          "type.rkt"
+         "env/assoc.rkt"
          "util/for-id-table.rkt")
 (module+ test
   (require rackunit
@@ -148,15 +149,15 @@
 ;; Env Id -> Signature or #f
 ;; return signature of module with given name
 (define (env-lookup-module G x)
-  (match (assoc x G free-identifier=?)
-    [(list _ (mod-binding s)) s]
+  (match (lookup G x)
+    [(mod-binding s) s]
     [_ #f]))
 
 ;; Env Id -> Signature or #f
 ;; return signature defined by given name
 (define (env-lookup-signature G x)
-  (match (assoc x G free-identifier=?)
-    [(list _ (sig-binding s)) s]
+  (match (lookup G x)
+    [(sig-binding s) s]
     [_ #f]))
 
 ;; ---------------------------------------------------------
@@ -199,7 +200,7 @@
   (match-define (pi-sig A-x A-in A-out) A)
   (match-define (pi-sig B-x B-in B-out) B)
   (define A-out* (signature-subst-id A-out A-x B-x))
-  (define env* (cons (list B-x (mod-binding B-in)) env))
+  (define env* (extend env (list (list B-x (mod-binding B-in)))))
   (and (signature-matches? env B-in A-in)
        ;; we add B-in to the environment here because it is the most
        ;; specific type that both signatures need to be compatible with
@@ -281,12 +282,12 @@
   ;; REMEMBER: the entries in this env are EnvBindings!
   ;;           refer to the definition of Env
   (define env*
-    (for/fold ([env* env])
-              ([(A-sym A-comp) (in-hash A)])
-      (match-define (sig-component _ A-entry) A-comp)
-      (cons (list (hash-ref sym->id A-sym)
-                  (sig-entry->env-binding A-id->common A-entry))
-            env*)))
+    (extend
+     env
+     (for/list ([(A-sym A-comp) (in-hash A)])
+       (match-define (sig-component _ A-entry) A-comp)
+       (list (hash-ref sym->id A-sym)
+             (sig-entry->env-binding A-id->common A-entry)))))
 
   ;; check that all components in B correspond with components in A
   (for/and ([(B-x B-comp) (in-hash B)])
@@ -486,11 +487,11 @@ M.L.T4 = (alias M.J.D)
 
 ;; Converting internal type environments to "external" signatures
 
-(provide module-env->sig)
+(provide module-bindings->sig)
 
-;; Env -> Sig
-(define (module-env->sig module-G)
-  (for/hash ([p (in-list module-G)])
+;; Bindings -> Sig
+(define (module-bindings->sig module-envl)
+  (for/hash ([p (in-list module-envl)])
     (match-define (list id binding) p)
     (define decl
       (match binding
@@ -510,9 +511,9 @@ M.L.T4 = (alias M.J.D)
 
 (module+ test
   (define-binary-check (check-sig-matches A B)
-    (signature-matches? '() A B))
+    (signature-matches? (empty-env) A B))
   (define-binary-check (check-not-sig-matches A B)
-    (not (signature-matches? '() A B)))
+    (not (signature-matches? (empty-env) A B)))
 
   (define-simple-macro (sig [x:id sig-entry:expr] ...)
     #:with [x* ...] (generate-temporaries #'[x ...])

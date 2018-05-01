@@ -69,7 +69,7 @@
              [(val-decl τ)        `(val ,k : ,(rec env* τ))]
              [(type-opaque-decl)  `(type ,k)]
              [(type-alias-decl τ) `(type ,k = ,(rec env* τ))]
-             [(mod-decl sub)      `(define-module ,k : ,(rec env* sub))])))]
+             [(mod-decl sub)      `(module ,k : ,(rec env* sub))])))]
     [(pi-sig (? identifier? x) A B)
      (define env*
        (free-id-table-set env x (syntax-e x)))
@@ -77,4 +77,3 @@
     ;; else
     [_
      (unconvertable τ)]))
-

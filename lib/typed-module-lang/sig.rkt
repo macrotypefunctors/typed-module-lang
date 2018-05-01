@@ -254,7 +254,6 @@
     (named-reference-map (λ (x) (free-id-table-ref m->c x x)) t))
   (define (sig-entry-map-mod->common m->c entry)
     (match entry
-      ;; TODO: submodules
       [(type-alias-decl t) (type-alias-decl (type-map-mod->common m->c t))]
       [(type-opaque-decl) entry]
       [(val-decl t) (val-decl (type-map-mod->common m->c t))]
@@ -275,6 +274,7 @@
     (match entry
       ;; TODO: submodules
       [(val-decl t) (val-binding (type-map-mod->common m->c t))]
+      [(mod-decl s) (mod-binding (signature-map-mod->common m->c s))]
       [comp (type-binding (sig-entry-map-mod->common m->c entry))]))
 
   ;; extend the env with all the components from A
@@ -311,6 +311,8 @@
      #true]
     [[(type-alias-decl _) (type-opaque-decl)]
      #true]
+    [[(mod-decl s-A) (mod-decl s-B)]
+     (signature-matches? env s-A s-B)]
     [[_ _]
      #false]))
 

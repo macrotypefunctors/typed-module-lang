@@ -80,9 +80,10 @@
    (syntax-local-value
     (internal-definition-context-introduce* env x 'add)
     #f
-    env)))
-
-;; --------------------------------------------------------------
+    (match env ; for backwards compatibility
+      ['() #f]
+      [(cons ctx _) ctx]
+      [ctx ctx]))))
 
 (define (env->assoc env)
   (for/list

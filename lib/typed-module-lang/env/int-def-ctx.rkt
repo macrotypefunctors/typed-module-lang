@@ -47,16 +47,7 @@
   (match ctx
     [(list ctxs ...)
      (for/fold ([stx stx]) ([ctx (in-list ctxs)])
-       (internal-definition-context-introduce ctx stx mode))]
-    [_
-     (internal-definition-context-introduce ctx stx mode)]))
-
-(define (internal-definition-context-binding-identifiers* ctx)
-  (match ctx
-    [(list ctxs ...)
-     (append-map internal-definition-context-binding-identifiers ctxs)]
-    [_
-     (internal-definition-context-binding-identifiers ctx)]))
+       (internal-definition-context-introduce ctx stx mode))]))
 
 ;; --------------------------------------------------------------
 
@@ -85,8 +76,10 @@
       [(cons ctx _) ctx]
       [ctx ctx]))))
 
+;; Env -> Bindings
 (define (env->assoc env)
-  (for/list
-      ([x (in-list (internal-definition-context-binding-identifiers* env))])
-    (list x (lookup env x))))
-
+  (for*/list ([ctx (in-list env)]
+              [id (in-list (internal-definition-context-binding-identifiers ctx))])
+    (define id- (internal-definition-context-introduce ctx id 'remove))
+    (define rhs (opaque-struct-value (syntax-local-value id #f ctx)))
+    (list id- rhs)))

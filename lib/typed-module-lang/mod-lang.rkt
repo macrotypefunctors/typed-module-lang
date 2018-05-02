@@ -216,7 +216,7 @@
    ;; the module-sig should definitely *not*
    ;; include bindings from the external-G
    #:with name (generate-temporary 'mod)
-   #:do [(define intro (make-syntax-introducer))
+   #:do [(define intro (make-syntax-introducer #t))
          (define-values [ds- module-bindings]
            (mod-body-tc-passes external-G (map intro (@ d))))
          ;; TODO: include the type-env too
@@ -265,7 +265,7 @@
                  (type opaque-name)
                  }
            ...]
-   ((make-syntax-introducer) #'[d ...])
+   ((make-syntax-introducer #t) #'[d ...])
 
    (define-values [G+modules sigs]
      (for/list/acc ([G external-G])

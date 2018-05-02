@@ -3,9 +3,10 @@
 (provide empty-env
          extend
          lookup
-         env->assoc)
+         env-ids)
 
-(require racket/match)
+(require racket/list
+         racket/match)
 
 ;; An Env is a [Listof [List Id EnvBinding]]
 
@@ -33,5 +34,5 @@
 
 ;; --------------------------------------------------------------
 
-(define (env->assoc env) env)
+(define (env-ids env) (map first env))
 

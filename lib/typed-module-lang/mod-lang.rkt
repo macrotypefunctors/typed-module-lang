@@ -57,7 +57,12 @@
                     ([d (in-list ds)])
         (define G+external (extend external-G Gl))
         (ec G+external ⊢md d ≫ d- submoddef⇒ Gl+)
-        (values (append Gl+ Gl)
+        (define Gl*
+          (for/list ([ent (in-list Gl+)])
+            (match ent
+              [(list k v)
+               (list (syntax-local-introduce k) v)])))
+        (values (append Gl* Gl)
                 d-)))
     (define G+modules (extend external-G module-bindings))
     (define-values [ds/1234 module-envl]
@@ -73,7 +78,12 @@
                     ([d (in-list ds)])
         (define G+external (extend external Gl))
         (ec G+external ⊢md d ≫ d- modsigdef⇒ Gl+)
-        (values (append Gl+ Gl)
+        (define Gl*
+          (for/list ([ent (in-list Gl+)])
+            (match ent
+              [(list k v)
+               (list (syntax-local-introduce k) v)])))
+        (values (append Gl* Gl)
                 d-)))
     (values ds/1 envl)))
 
@@ -136,9 +146,7 @@
   ;; as a type
   [⊢τ≫type⇐
    [dke ⊢τ #'(_ m:module-path x:id)]
-   (define G
-     (extend (empty-env)
-             (filter (compose mod-binding? second) (env->assoc dke))))
+   (define G dke)
    (ec G ⊢m #'m ≫ _ sig⇒ s)
    (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
    (define comp (sig-ref s (syntax-e #'x)))
@@ -169,7 +177,7 @@
    [external-G ⊢md #'(_ name:id = m:expr)]
    (ec external-G ⊢m #'m ≫ #'m- sig⇒ s)
    (er ⊢md≫moddef⇒ ≫ #`(define-module/pass-1234 name m-)
-       moddef⇒ (list (list #'name (mod-binding s))))])
+       moddef⇒ (list (list (syntax-local-introduce #'name) (mod-binding s))))])
 
 (define-typed-syntax define-module/pass-1234
   ;; pass 1 of core-lang-tc-passes
@@ -189,7 +197,8 @@
    [external-G ⊢md #'(_ name:id = s:expr)]
    (define signature (expand-signature external-G #'s))
    (er ⊢md≫modsigdef⇒ ≫ #`(define-syntax name #f)
-       modsigdef⇒ (list (list #'name (sig-binding signature))))])
+       modsigdef⇒ (list (list (syntax-local-introduce #'name)
+                              (sig-binding signature))))])
 
 ;; --------------------------------------------------------------
 
@@ -265,7 +274,7 @@
 
    (define dke+external-G
      ;; the things in the dke are "closer"
-     (extend (env->decl-kind-env external-G) dke))
+     (extend external-G dke))
 
    (define (expand-type type-stx)
      (expand-type/dke dke+external-G type-stx))
@@ -337,7 +346,7 @@
    [G ⊢s #'(_ base-sig:id type-id:id = τ-stx:expr)]
    (define base (expand-signature G #'base-sig))
    (define sym (syntax-e #'type-id))
-   (define τ (expand-type/dke (env->decl-kind-env G) #'τ-stx))
+   (define τ (expand-type/dke G #'τ-stx))
    ;; TODO: how to preserve the scope that the `τ` should be in?
    ;;       (avoid capturing definitions from the base sig)
    (type-stx

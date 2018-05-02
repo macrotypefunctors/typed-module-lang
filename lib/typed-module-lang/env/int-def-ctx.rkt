@@ -3,7 +3,7 @@
 (provide empty-env
          extend
          lookup
-         env->assoc)
+         env-ids)
 
 (require racket/list
          racket/match)
@@ -62,7 +62,8 @@
   (define env* (internal-definition-context-extend env))
   (for ([entry (in-list bindings)])
     (match-define (list id binding) entry)
-    (syntax-local-bind-syntaxes* (list id) #`#,(opaque-struct binding) env*))
+    (define id* (internal-definition-context-introduce* env* id 'add))
+    (syntax-local-bind-syntaxes* (list id*) #`#,(opaque-struct binding) env*))
   env*)
 
 ;; Env Id -> EnvBinding
@@ -73,13 +74,12 @@
     #f
     (match env ; for backwards compatibility
       ['() #f]
-      [(cons ctx _) ctx]
+      [(cons ctx _) env]
       [ctx ctx]))))
 
-;; Env -> Bindings
-(define (env->assoc env)
+;; Env -> [Listof Id]
+(define (env-ids env)
   (for*/list ([ctx (in-list env)]
-              [id (in-list (internal-definition-context-binding-identifiers ctx))])
-    (define id- (internal-definition-context-introduce ctx id 'remove))
-    (define rhs (opaque-struct-value (syntax-local-value id #f ctx)))
-    (list id- rhs)))
+              [id (internal-definition-context-binding-identifiers ctx)])
+    (internal-definition-context-introduce* env id 'remove)))
+

@@ -65,7 +65,7 @@
   [≫ decl- decl⇒ intro-env]
   #:in-stx decl
   #:out-stx decl-
-  #:stop-ids (map first (env->assoc dke))
+  #:stop-ids (env-ids dke)
   #:internal-definition-context dke
   #:bad-output (raise-syntax-error #f "expected a type or val declaration" decl))
 
@@ -91,7 +91,7 @@
   [≫ expr-]
   #:in-stx expr
   #:out-stx expr-
-  #:stop-ids (map first (env->assoc G))
+  #:stop-ids (env-ids G)
   #:internal-definition-context G
   #:bad-output (raise-syntax-error #f "expected a typed expression" expr))
 
@@ -103,7 +103,7 @@
   [≫ expr- ⇒ type]
   #:in-stx expr
   #:out-stx expr-
-  #:stop-ids (map first (env->assoc G))
+  #:stop-ids (env-ids G)
   #:internal-definition-context G
   #:bad-output (raise-syntax-error #f "expected a typed expression" expr)
   #:implicit-rule
@@ -129,7 +129,7 @@
   [≫ ty- type⇐]
   #:in-stx ty
   #:out-stx ty-
-  #:stop-ids (map first (env->assoc dke))
+  #:stop-ids (env-ids dke)
   #:internal-definition-context G
   #:bad-output (raise-syntax-error #f "expected a type" ty))
 
@@ -149,7 +149,7 @@
   [≫ module-expr- sig⇒ signature-expr]
   #:in-stx module-expr
   #:out-stx module-expr-
-  #:stop-ids (map first (env->assoc external-G))
+  #:stop-ids (env-ids external-G)
   #:internal-definition-context external-G
   #:bad-output
   (raise-syntax-error #f "expected a typed module expression" module-expr))
@@ -161,7 +161,7 @@
   [≫ signature-expr- signature⇐]
   #:in-stx signature-expr
   #:out-stx signature-expr-
-  #:stop-ids (map first (env->assoc external-G))
+  #:stop-ids (env-ids external-G)
   #:internal-definition-context external-G
   #:bad-output (raise-syntax-error #f "expected a signature" signature-expr))
 

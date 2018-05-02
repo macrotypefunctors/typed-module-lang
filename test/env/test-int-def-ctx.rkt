@@ -11,6 +11,10 @@
                        typed-module-lang/env/int-def-ctx))
 
   (begin-for-syntax
+    (define (env->assoc E)
+      (for/list ([id (in-list (env-ids E))])
+        (list id (lookup E id))))
+
     (match-define (list X Y Z)
       (generate-temporaries #'[x y z]))
 
@@ -28,7 +32,7 @@
     (check-equal? (lookup E2 Y) "b")
     (check-equal? (lookup E2 Z) "c")
 
-    (match-define `([,Z* "c"] [,X* "a"] [,Y* "b"])
+    (match-define (list-no-order (list Z* "c") (list X* "a") (list Y* "b"))
       (env->assoc E2))
 
     (check-bound-id=? X X*)

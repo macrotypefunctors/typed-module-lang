@@ -45,19 +45,6 @@
     [(val-binding τ) τ]
     [_ #f]))
 
-;; Env -> DeclKindEnv
-;; if it encounters a kind of binding that isn't val/type,
-;; then it passes it through
-(define (env->decl-kind-env G)
-  (extend
-   (empty-env)
-   (for/list ([entry (in-list (env->assoc G))])
-     (match entry
-       [(list x (val-binding _)) (list x 'val)]
-       [(list x (type-binding _)) (list x 'type)]
-       [_ entry]))))
-
-
 ;; ------------------------------------------------------
 
 ;; a Type is one of

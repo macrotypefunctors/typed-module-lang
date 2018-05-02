@@ -80,7 +80,11 @@
     (define dke+external
       ;; note: important that 'dkel' entries are "closer"
       ;;   than entries in 'external-G'
-      (extend (env->decl-kind-env external-G) dkel))
+      (extend external-G
+              (for/list ([ent (in-list dkel)])
+                (match ent
+                  [(list k v)
+                   (list (syntax-local-introduce k) v)]))))
     ;; pass 2
     (define-values [envl ds/2]
       (for/list/acc ([Gl '()])
@@ -88,17 +92,22 @@
         (ec dke+external ⊢ d ≫ d- decl⇒ Gl+)
         (values (append Gl+ Gl)
                 d-)))
+    (define envl*
+      (for/list ([ent (in-list envl)])
+        (match ent
+          [(list k v)
+           (list (syntax-local-introduce k) v)])))
     (define env+external
       ;; note: important that 'envl' entries are "closer"
       ;;   than entries in 'external-G'
-      (extend external-G envl))
+      (extend external-G envl*))
     ;; pass 3
     (define ds/3
       (for/list ([d (in-list ds/2)])
         (ec env+external ⊢ d ≫ d- val-def⇐)
         d-))
     ; note: return just 'envl', not 'env+external' (see purpose statement)
-    (values ds/3 envl)))
+    (values ds/3 envl*)))
 
 (define-syntax core-lang-module-begin
   (syntax-parser
@@ -120,7 +129,8 @@
   ;; pass 1
   [⊢≫decl-kinds⇒ [⊢ stx]
    #:with (_ x:id . _) stx
-   (er ⊢≫decl-kinds⇒ ≫ stx decl-kinds⇒ (list (list #'x 'val)))]
+   (er ⊢≫decl-kinds⇒ ≫ stx
+       decl-kinds⇒ (list (list (syntax-local-introduce #'x) 'val)))]
   ;; pass 2
   [⊢≫decl⇒
    [dke ⊢ #'(_ x : τ-stx:expr . stuff)]
@@ -129,7 +139,7 @@
    (er ⊢≫decl⇒
        ≫ (quasisyntax/loc this-syntax
            (val x : #,(type-stx τ) . stuff))
-       decl⇒ (list (list #'x (val-binding τ))))]
+       decl⇒ (list (list (syntax-local-introduce #'x) (val-binding τ))))]
   ;; pass 3
   [⊢≫val-def⇐
    ; this G will include all top-level definitions in the program
@@ -147,7 +157,7 @@
    (er ⊢≫decl-kinds⇒
        ≫ (syntax/loc this-syntax
            (type X . stuff))
-       decl-kinds⇒ (list (list #'X 'type)))]
+       decl-kinds⇒ (list (list (syntax-local-introduce #'X) 'type)))]
   ;; pass 2
   [⊢≫decl⇒
    [dke ⊢ #'(_ X = τ-stx)]
@@ -155,7 +165,8 @@
    ;; TODO: check for recursion / mutual-recursion somewhere
    (er ⊢≫decl⇒
        ≫ #'(type X = τ-stx)
-       decl⇒ (list (list #'X (type-binding (type-alias-decl τ)))))]
+       decl⇒ (list (list (syntax-local-introduce #'X)
+                         (type-binding (type-alias-decl τ)))))]
   ;; pass 3
   [⊢≫val-def⇐
    [_ ⊢ stx]
@@ -207,8 +218,12 @@
   ;; as a type
   [⊢τ≫type⇐
    [dke ⊢τ #'(_ x:id)]
-   ;; don't return er, return type-stx with a *type struct* instead
-   (type-stx (named-reference #'x))])
+   (match (lookup dke #'x)
+     [(or 'type (type-binding _))
+      ;; don't return er, return type-stx with a *type struct* instead
+      (type-stx (named-reference #'x))]
+     [_
+      (raise-syntax-error #f "expected a type" #'x)])])
 
 (define-typed-syntax core-lang-datum
   [⊢e≫⇒
@@ -241,7 +256,7 @@
    (er ⊢e≫⇐ ≫ #`(lambda (x ...) body-))]
   [⊢e≫⇒
    [G ⊢e #'(_ ([x:id : τ-stx] ...) body:expr)]
-   (define dke (env->decl-kind-env G))
+   (define dke G)
 
    (define (expand-type τ-stx)
      (expand-type/dke dke τ-stx))

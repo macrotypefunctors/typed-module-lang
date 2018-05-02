@@ -26,14 +26,14 @@
   (define env* (syntax-local-make-definition-context env))
   (for ([entry (in-list bindings)])
     (match-define (list id binding) entry)
-    (syntax-local-bind-syntaxes (list id) #`#,(opaque-struct entry) env*))
+    (syntax-local-bind-syntaxes (list id) #`#,(opaque-struct binding) env*))
   env*)
 
 ;; Env Id -> EnvBinding
 (define (lookup env x)
   (opaque-struct-value
    (syntax-local-value
-    (internal-definition-context-introduce env x)
+    (internal-definition-context-introduce env x 'add)
     #f
     env)))
 

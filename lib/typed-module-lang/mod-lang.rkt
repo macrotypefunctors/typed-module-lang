@@ -212,8 +212,9 @@
    ;; the module-sig should definitely *not*
    ;; include bindings from the external-G
    #:with name (generate-temporary 'mod)
-   #:do [(define-values [ds- module-bindings]
-           (mod-body-tc-passes external-G (@ d)))
+   #:do [(define intro (make-syntax-introducer))
+         (define-values [ds- module-bindings]
+           (mod-body-tc-passes external-G (map intro (@ d))))
          ;; TODO: include the type-env too
          ;; TODO: determine if the above comment is still relevant?
          (define module-sig (module-bindings->sig module-bindings))]
@@ -251,12 +252,16 @@
   #:literals [val type module]
   #:datum-literals [: =]
   [⊢s≫signature⇐
-   [external-G ⊢s #'(_ {~alt (module mod-name : mod-sig)
-                             (val val-name : val-type)
-                             (type alias-name = alias-type)
-                             (type opaque-name)
-                             }
-                       ...)]
+   [external-G ⊢s #'(_ d:expr ...)]
+
+
+   #:with [{~alt (module mod-name : mod-sig)
+                 (val val-name : val-type)
+                 (type alias-name = alias-type)
+                 (type opaque-name)
+                 }
+           ...]
+   ((make-syntax-introducer) #'[d ...])
 
    (define-values [G+modules sigs]
      (for/list/acc ([G external-G])

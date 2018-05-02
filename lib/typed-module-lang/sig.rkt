@@ -7,12 +7,6 @@
          "type.rkt"
          "env/int-def-ctx.rkt"
          "util/for-id-table.rkt")
-(module+ test
-  (require rackunit
-           racket/function
-           syntax/parse/define
-           (for-syntax racket/base
-                       racket/syntax)))
 
 ;; ---------------------------------------------------------
 
@@ -509,7 +503,25 @@ M.L.T4 = (alias M.J.D)
 
 ;; -----------------------------------------------------
 
-(module+ test
+(module* test/ct racket/base
+  (provide run-tests)
+  (require (for-syntax racket/base
+                       rackunit
+                       racket/function
+                       syntax/parse/define
+                       (submod "..")
+                       racket/match
+                       racket/bool
+                       racket/list
+                       racket/syntax
+                       syntax/id-table
+                       "type.rkt"
+                       "env/int-def-ctx.rkt"
+                       "util/for-id-table.rkt"
+                       (for-syntax racket/base
+                                   racket/syntax)))
+  (define-syntax (run-tests stx)
+  
   (define-binary-check (check-sig-matches A B)
     (signature-matches? (empty-env) A B))
   (define-binary-check (check-not-sig-matches A B)
@@ -589,10 +601,12 @@ M.L.T4 = (alias M.J.D)
 
   (let ([M #'M])
     (define env
-      (list
-       (list M (mod-binding (sig
-                             [Inner
-                              (mod-decl (sig [t (type-alias-decl (Int))]))])))))
+      (extend
+       (empty-env)
+       (list
+        (list M (mod-binding (sig
+                              [Inner
+                               (mod-decl (sig [t (type-alias-decl (Int))]))]))))))
     (check-true
      (type-matches? env
                     (Int)
@@ -628,4 +642,11 @@ M.L.T4 = (alias M.J.D)
      (pi x J (sig [v (val-decl (dot (named-reference x) 't))]))
      (pi x J* (sig [v (val-decl (Int))])))
     )
+  #'(void)))
+
+(module+ test
+  (require (submod ".." test/ct)
+           syntax/macro-testing)
+  (convert-compile-time-error (run-tests))
   )
+

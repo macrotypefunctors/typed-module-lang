@@ -1,7 +1,7 @@
 #lang racket
 (provide (all-defined-out))
 
-(require "env/assoc.rkt")
+(require "env/int-def-ctx.rkt")
 
 ;; TODO: yes the below definitions look exactly like the
 ;;  definitions in "sig.rkt"; we should modify "sig.rkt" to

@@ -5,7 +5,7 @@
          racket/syntax
          syntax/id-table
          "type.rkt"
-         "env/assoc.rkt"
+         "env/int-def-ctx.rkt"
          "util/for-id-table.rkt")
 (module+ test
   (require rackunit

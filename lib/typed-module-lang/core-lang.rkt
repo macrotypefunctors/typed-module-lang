@@ -38,7 +38,7 @@
                      macrotypes-nonstx/id-transformer
                      "type-check.rkt"
                      "type.rkt"
-                     "env/assoc.rkt"
+                     "env/int-def-ctx.rkt"
                      "print/print-type.rkt"
                      "print/print-env.rkt"
                      "util/for-acc.rkt"

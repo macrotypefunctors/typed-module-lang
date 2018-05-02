@@ -13,7 +13,7 @@
          macrotypes-nonstx/type-check
          "type.rkt"
          "sig.rkt"
-         "env/assoc.rkt"
+         "env/int-def-ctx.rkt"
          "print/print-type.rkt")
 
 ;; -------------------------------------------------------------------
@@ -29,6 +29,7 @@
   #:in-stx module-def
   #:out-stx module-def-
   #:stop-ids '()
+  #:internal-definition-context external-G
   #:bad-output
   (raise-syntax-error #f "expected a typed module definition" module-def))
 
@@ -65,6 +66,7 @@
   #:in-stx decl
   #:out-stx decl-
   #:stop-ids (map first (env->assoc dke))
+  #:internal-definition-context dke
   #:bad-output (raise-syntax-error #f "expected a type or val declaration" decl))
 
 ;; expand value definitions and typecheck their RHS
@@ -77,6 +79,7 @@
   #:in-stx defn
   #:out-stx defn-
   #:stop-ids '()
+  #:internal-definition-context G
   #:bad-output (raise-syntax-error #f "expected a type or val declaration" defn))
 
 ;; typechecking expressions within a mod
@@ -89,6 +92,7 @@
   #:in-stx expr
   #:out-stx expr-
   #:stop-ids (map first (env->assoc G))
+  #:internal-definition-context G
   #:bad-output (raise-syntax-error #f "expected a typed expression" expr))
 
 (define-expand-check-relation tc
@@ -100,6 +104,7 @@
   #:in-stx expr
   #:out-stx expr-
   #:stop-ids (map first (env->assoc G))
+  #:internal-definition-context G
   #:bad-output (raise-syntax-error #f "expected a typed expression" expr)
   #:implicit-rule
   [⊢e≫⇐
@@ -125,6 +130,7 @@
   #:in-stx ty
   #:out-stx ty-
   #:stop-ids (map first (env->assoc dke))
+  #:internal-definition-context G
   #:bad-output (raise-syntax-error #f "expected a type" ty))
 
 ;; expand-type/dke : DeclKindEnv Stx -> Type
@@ -144,6 +150,7 @@
   #:in-stx module-expr
   #:out-stx module-expr-
   #:stop-ids (map first (env->assoc external-G))
+  #:internal-definition-context external-G
   #:bad-output
   (raise-syntax-error #f "expected a typed module expression" module-expr))
 
@@ -155,6 +162,7 @@
   #:in-stx signature-expr
   #:out-stx signature-expr-
   #:stop-ids (map first (env->assoc external-G))
+  #:internal-definition-context external-G
   #:bad-output (raise-syntax-error #f "expected a signature" signature-expr))
 
 ;; Env Stx -> Signature
@@ -176,6 +184,7 @@
   #:in-stx module-def
   #:out-stx module-def-
   #:stop-ids '()
+  #:internal-definition-context external-G
   #:bad-output
   (raise-syntax-error #f "expected a typed module definition" module-def))
 
@@ -192,6 +201,7 @@
   #:in-stx module-def
   #:out-stx module-def-
   #:stop-ids '()
+  #:internal-definition-context external-G
   #:bad-output
   (raise-syntax-error #f "expected a typed module definition" module-def)
   #:implicit-rule

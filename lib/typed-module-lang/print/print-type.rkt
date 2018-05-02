@@ -4,9 +4,9 @@
          sig->string)
 
 (require racket/pretty
-         syntax/id-table
          "../type.rkt"
-         "../sig.rkt")
+         "../sig.rkt"
+         "../env/label-env.rkt")
 
 (module+ private
   (provide ->s-expr
@@ -15,11 +15,11 @@
 ;; ---------------------------------------------------------
 
 (define (type->string τ)
-  (define env (make-immutable-free-id-table))
+  (define env (empty-label-env))
   (pretty-format (->s-expr env τ) #:mode 'write))
 
 (define (sig->string τ)
-  (define env (make-immutable-free-id-table))
+  (define env (empty-label-env))
   (pretty-format (->s-expr env τ) #:mode 'write))
 
 ;; ---------------------------------------------------------
@@ -37,7 +37,7 @@
 
 ;; ---------------------------------------------------------
 
-;; An Env is a [FreeIdTableOf Symbol]
+;; An Env is a [LabelEnvof Symbol]
 ;; maps identifiers to their *external*-ly seen names
 
 (define (->s-expr env τ)
@@ -47,8 +47,8 @@
   (define (rc τ) (rec env τ))
   (match τ
     ;; generic things, both types and module paths
-    [(named-reference (? identifier? x))
-     (free-id-table-ref env x (λ () (syntax-e x)))]
+    [(label-reference label)
+     (label-env-lookup env label (λ () label))]
     [(dot path (? symbol? x))
      (*dot (rc path) x)]
     ;; types
@@ -59,9 +59,10 @@
     ;; signatures
     [(? sig? s)
      (define env*
-       (for/fold ([env* env]) ([(k v) (in-hash s)])
-         (match-define (sig-component id _) v)
-         (free-id-table-set env* id k)))
+       (label-env-extend env
+                         (for/list ([(k v) (in-hash s)])
+                           (match-define (sig-component label _) v)
+                           (list label k))))
      `(sig
        ,@(for/list ([(k v) (in-hash s)])
            (match-define (sig-component _ entry) v)
@@ -70,10 +71,10 @@
              [(type-opaque-decl)  `(type ,k)]
              [(type-alias-decl τ) `(type ,k = ,(rec env* τ))]
              [(mod-decl sub)      `(module ,k : ,(rec env* sub))])))]
-    [(pi-sig (? identifier? x) A B)
+    [(pi-sig x A B)
      (define env*
-       (free-id-table-set env x (syntax-e x)))
-     `(Π ([,(syntax-e x) : ,(rc A)]) ,(rec env* B))]
+       (label-env-extend env (list (list x x))))
+     `(Π ([,x : ,(rc A)]) ,(rec env* B))]
     ;; else
     [_
      (unconvertable τ)]))

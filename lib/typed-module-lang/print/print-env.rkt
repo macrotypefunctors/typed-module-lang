@@ -6,13 +6,12 @@
          "../type.rkt"
          "../sig.rkt"
          "print-type.rkt"
-         "../util/for-id-table.rkt"
          (submod "print-type.rkt" private))
 
 (define (print-env G [out (current-output-port)])
   (define rename-env
-    (for/free-id-table ([entry (in-list G)])
-      (values (first entry) (syntax-e (first entry)))))
+    (for/hash ([entry (in-list G)])
+      (values (second entry) (syntax-e (first entry)))))
   (for ([entry (in-list (reverse G))])
     (pretty-write
      (convert rename-env entry)
@@ -25,7 +24,7 @@
      (apply fprintf out str vs))])
 
 (define (convert rnm-env entry)
-  (match-define (list x-id binding) entry)
+  (match-define (list x-id label binding) entry)
   (define x (syntax-e x-id))
   (match binding
     [(val-binding τ) (fmt "val ~s : ~s" (list x (->s-expr rnm-env τ)))]

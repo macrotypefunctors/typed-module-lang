@@ -2,7 +2,7 @@
 
 (define-signature S =
   (sig
-   (module B : (sig (type t = Bool)))
+   (module B : (sig (type X = Bool)))
    (type t)))
 
 (define-module A =
@@ -12,9 +12,10 @@
     (define-module C =                ;                               |
       (seal (mod                      ;                               |
              (define-module B =       ;                               |
-               (mod (type t = Bool))) ;                               |
+               (mod (type X = Bool))) ;                               |
              (type t = Int))          ;                               |
             :>                        ;                               |
+            ;; this B.X should be Int ;                               |
             (where S t = B.X)))       ; <-- this B *should* refer to >|
     ))
 

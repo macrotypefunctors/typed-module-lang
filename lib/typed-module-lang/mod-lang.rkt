@@ -39,7 +39,8 @@
                      "type-check.rkt"
                      "sig.rkt"
                      "type.rkt"
-                     "env/int-def-ctx.rkt"
+                     "env/combined-env.rkt"
+                     "env/label-env.rkt"
                      "print/print-type.rkt"
                      "print/print-env.rkt"
                      "util/for-acc.rkt"))
@@ -61,7 +62,7 @@
           (for/list ([ent (in-list Gl+)])
             (match ent
               [(list k v)
-               (list (syntax-local-introduce k) v)])))
+               (list (syntax-local-introduce k) (fresh-label k) v)])))
         (values (append Gl* Gl)
                 d-)))
     (define G+modules (extend external-G module-bindings))
@@ -82,7 +83,7 @@
           (for/list ([ent (in-list Gl+)])
             (match ent
               [(list k v)
-               (list (syntax-local-introduce k) v)])))
+               (list (syntax-local-introduce k) (fresh-label k) v)])))
         (values (append Gl* Gl)
                 d-)))
     (values ds/1 envl)))
@@ -124,17 +125,17 @@
 ;; --------------------------------------------------------------
 
 (begin-for-syntax
-  (define-syntax-class module-path
-    #:attributes (path)
-    (pattern ((~literal #%dot) M:module-path x:id)
-             #:attr path (dot (attribute M.path) (syntax-e #'x)))
-    (pattern x:id
-             #:attr path (named-reference #'x))))
+  (define-syntax-class (module-path G)
+    #:attributes [path]
+    [pattern ((~literal #%dot) (~var M (module-path G)) x:id)
+             #:attr path (dot (attribute M.path) (syntax-e #'x))]
+    [pattern x:id
+             #:attr path (label-reference (lookup-label G #'x))]))
 
 (define-typed-syntax #%dot
   ;; as an expression
   [⊢e≫⇒
-   [G ⊢e #'(_ m:module-path x:id)]
+   [G ⊢e #'(_ (~var m (module-path G)) x:id)]
    (ec G ⊢m #'m ≫ #'m- sig⇒ s)
    (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
    (define τ_x
@@ -145,18 +146,21 @@
 
   ;; as a type
   [⊢τ≫type⇐
-   [dke ⊢τ #'(_ m:module-path x:id)]
+   [dke ⊢τ #'(_ (~var m (module-path dke)) x:id)]
    (define G dke)
    (ec G ⊢m #'m ≫ _ sig⇒ s)
    (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
-   (define comp (sig-ref s (syntax-e #'x)))
-   (unless (match? comp (sig-component _ (or (type-alias-decl _) (type-opaque-decl))))
-     (raise-syntax-error #f "not a type binding" #'x))
-   (type-stx (dot (attribute m.path) (syntax-e #'x)))]
+   (define τ_x
+     (match (mod-path-lookup G (attribute m.path) (syntax-e #'x))
+       [(or (type-alias-decl _)
+           (type-opaque-decl))
+        (dot (attribute m.path) (syntax-e #'x))]
+       [_ (raise-syntax-error #f "not a type binding" #'x)]))
+   (type-stx τ_x)]
 
   ;; as a module expression
   [⊢m≫sig⇒
-   [G ⊢m #'(_ m:module-path x:id)]
+   [G ⊢m #'(_ (~var m (module-path G)) x:id)]
    (ec G ⊢m #'m ≫ #'m- sig⇒ s)
    (unless (sig? s) (raise-syntax-error #f "expected a mod" #'m))
    (define s_x
@@ -219,8 +223,8 @@
          ;; TODO: determine if the above comment is still relevant?
          (define module-sig (module-bindings->sig module-bindings))]
    #:with [x ...] (for/list ([entry (in-list module-bindings)]
-                             #:when (or (val-binding? (second entry))
-                                        (mod-binding? (second entry))))
+                             #:when (or (val-binding? (third entry))
+                                        (mod-binding? (third entry))))
                     (first entry))
    #:with [[k/v ...] ...]
    #'[['x x] ...]
@@ -268,14 +272,15 @@
                    ([x (in-list (@ mod-name))]
                     [sig-stx (in-list (@ mod-sig))])
        (define sig (expand-signature G sig-stx))
-       (values (extend G (list (list x (mod-binding sig))))
+       (values (extend G (list (list x (fresh-label x) (mod-binding sig))))
                sig)))
 
    (define dke
      ;; TODO: check for duplicate identifiers
-     (append (map (λ (x s) (list x (mod-binding s))) (@ mod-name) sigs)
-             (map (λ (x) (list x 'type)) (@ alias-name))
-             (map (λ (x) (list x 'type)) (@ opaque-name))))
+     (append (map (λ (x s) (list x (fresh-label x) (mod-binding s))) (@ mod-name) sigs)
+             (map (λ (x) (list x (fresh-label x) 'type)) (@ alias-name))
+             (map (λ (x) (list x (fresh-label x) 'type)) (@ opaque-name))
+             (map (λ (x) (list x (fresh-label x) 'val)) (@ val-name))))
 
    (define dke+external-G
      ;; the things in the dke are "closer"
@@ -287,12 +292,15 @@
    (define val-τs   (map expand-type (@ val-type)))
    (define alias-τs (map expand-type (@ alias-type)))
 
+   (define (label x)
+     (lookup-label dke+external-G x))
+
    (type-stx
     (module-bindings->sig
-     (append (map list (@ mod-name) (map mod-binding sigs))
-             (map list (@ val-name) (map val-binding val-τs))
-             (map list (@ alias-name) (map (compose type-binding type-alias-decl) alias-τs))
-             (map list (@ opaque-name) (map (const (type-binding (type-opaque-decl))) (@ opaque-name))))))])
+     (append (map list (@ mod-name) (map label (@ mod-name)) (map mod-binding sigs))
+             (map list (@ val-name) (map label (@ val-name)) (map val-binding val-τs))
+             (map list (@ alias-name) (map label (@ alias-name)) (map (compose type-binding type-alias-decl) alias-τs))
+             (map list (@ opaque-name) (map label (@ opaque-name)) (map (const (type-binding (type-opaque-decl))) (@ opaque-name))))))])
 
 ;; --------------------------------------------------------------
 
@@ -301,9 +309,10 @@
   [⊢s≫signature⇐
    [external-G ⊢s #'(_ ([x:id : A-stx]) B-stx)]
    (define A (expand-signature external-G #'A-stx))
-   (define body-G (extend external-G (list (list #'x (mod-binding A)))))
+   (define x-label (fresh-label #'x))
+   (define body-G (extend external-G (list (list #'x x-label (mod-binding A)))))
    (define B (expand-signature body-G #'B-stx))
-   (type-stx (pi-sig #'x A B))])
+   (type-stx (pi-sig x-label A B))])
 
 ;; --------------------------------------------------------------
 
@@ -312,9 +321,10 @@
   [⊢m≫sig⇒
    [G ⊢m #'(_ ([x:id : A-stx]) body-module:expr)]
    (define A (expand-signature G #'A-stx))
-   (define body-G (extend G (list (list #'x (mod-binding A)))))
+   (define x-label (fresh-label #'x))
+   (define body-G (extend G (list (list #'x x-label (mod-binding A)))))
    (ec body-G ⊢m #'body-module ≫ #'body-module- sig⇒ B)
-   (er ⊢m≫sig⇒ ≫ #'(λ (x) body-module-) sig⇒ (pi-sig #'x A B))]
+   (er ⊢m≫sig⇒ ≫ #'(λ (x) body-module-) sig⇒ (pi-sig x-label A B))]
   [else
    #:with (_ . rst) this-syntax
    #'(core-lambda . rst)])
@@ -324,7 +334,7 @@
 (define-typed-syntax mod-lang-#%app
   ;; as a module
   [⊢m≫sig⇒
-     [G ⊢m #'(_ fun ~! arg:module-path)]
+     [G ⊢m #'(_ fun ~! (~var arg (module-path G)))]
      ;; TODO: allow arg to be arbitrary module expression
      ;;   ... may require figuring out how to solve let vs. submodule ?
      (ec G ⊢m #'fun ≫ #'fun- sig⇒ (pi-sig x A B))

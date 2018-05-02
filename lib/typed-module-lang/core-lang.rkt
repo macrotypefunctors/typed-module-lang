@@ -38,7 +38,8 @@
                      macrotypes-nonstx/id-transformer
                      "type-check.rkt"
                      "type.rkt"
-                     "env/int-def-ctx.rkt"
+                     "env/combined-env.rkt"
+                     "env/label-env.rkt"
                      "print/print-type.rkt"
                      "print/print-env.rkt"
                      "util/for-acc.rkt"
@@ -84,7 +85,7 @@
               (for/list ([ent (in-list dkel)])
                 (match ent
                   [(list k v)
-                   (list (syntax-local-introduce k) v)]))))
+                   (list (syntax-local-introduce k) (fresh-label k) v)]))))
     ;; pass 2
     (define-values [envl ds/2]
       (for/list/acc ([Gl '()])
@@ -96,7 +97,10 @@
       (for/list ([ent (in-list envl)])
         (match ent
           [(list k v)
-           (list (syntax-local-introduce k) v)])))
+           (define k* (syntax-local-introduce k))
+           (list k*
+                 (lookup-label dke+external k*)
+                 v)])))
     (define env+external
       ;; note: important that 'envl' entries are "closer"
       ;;   than entries in 'external-G'
@@ -221,7 +225,7 @@
    (match (lookup dke #'x)
      [(or 'type (type-binding _))
       ;; don't return er, return type-stx with a *type struct* instead
-      (type-stx (named-reference #'x))]
+      (type-stx (label-reference (lookup-label dke #'x)))]
      [_
       (raise-syntax-error #f "expected a type" #'x)])])
 
@@ -239,8 +243,8 @@
   (define (find-arrow-type G τ)
     (match τ
       [(Arrow _ _) τ]
-      [(named-reference x)
-       (match (env-lookup-type-decl G x)
+      [(label-reference x)
+       (match (lenv-lookup-type-decl (env-label-env G) x)
          [(type-alias-decl τ*) (find-arrow-type G τ*)]
          [_ #f])]
       [_ #f])))
@@ -251,7 +255,10 @@
    (match-define (Arrow τ_as τ_b) (find-arrow-type G τ_expected))
    (define body-G
      (extend G
-             (map list (attribute x) (map val-binding τ_as))))
+             (map list
+                  (attribute x)
+                  (map fresh-label (attribute x))
+                  (map val-binding τ_as))))
    (ec body-G ⊢e #'body ≫ #'body- ⇐ τ_b)
    (er ⊢e≫⇐ ≫ #`(lambda (x ...) body-))]
   [⊢e≫⇒
@@ -264,7 +271,10 @@
    (define τ_xs (map expand-type (attribute τ-stx)))
    (define body-G
      (extend G
-             (map list (attribute x) (map val-binding τ_xs))))
+             (map list
+                  (attribute x)
+                  (map fresh-label (attribute x))
+                  (map val-binding τ_xs))))
    (ec body-G ⊢e #'body ≫ #'body- ⇒ τ_body)
    (er ⊢e≫⇒ ≫ #`(lambda (x ...) body-) ⇒ (Arrow τ_xs τ_body))])
 
@@ -308,7 +318,10 @@
    #:with [e- ...] es-
    (define body-G
      (extend G
-             (map list (attribute x) (map val-binding τ_xs))))
+             (map list
+                  (attribute x)
+                  (map fresh-label (attribute x))
+                  (map val-binding τ_xs))))
    (ec body-G ⊢e #'body ≫ #'body- ⇒ τ_b)
    (er ⊢e≫⇒ ≫ #`(let ([x e-] ...) body-) ⇒ τ_b)])
 

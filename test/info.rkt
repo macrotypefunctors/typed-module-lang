@@ -6,5 +6,6 @@
   '("base"
     "typed-module-lang-lib"
     "macrotypes-nonstx"
+    "rackunit-lib"
     ))
 

@@ -1,8 +1,9 @@
-#lang agile
+#lang racket/base
 
 (provide print-bindings)
 
-(require racket/pretty
+(require racket/match
+         racket/pretty
          "../type.rkt"
          "../sig.rkt"
          "../env/combined-env.rkt"

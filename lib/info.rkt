@@ -5,9 +5,6 @@
 (define deps
   '("base"
     "macrotypes-nonstx"
-    ))
-
-(define build-deps
-  '("rackunit-lib"
+    "rackunit-lib"
     ))
 

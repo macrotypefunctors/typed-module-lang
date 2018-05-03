@@ -1,9 +1,10 @@
-#lang agile
+#lang racket/base
 
 (provide type->string
          sig->string)
 
-(require racket/pretty
+(require racket/match
+         racket/pretty
          "../type.rkt"
          "../sig.rkt"
          "../env/combined-env.rkt"

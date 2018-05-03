@@ -12,6 +12,10 @@
     "scribble-lib"
     ))
 
+(define build-deps
+  '("racket-doc"
+    ))
+
 ;; ---------------------------------------------------------
 
 ;; Collection Info

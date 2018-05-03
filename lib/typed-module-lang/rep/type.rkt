@@ -16,6 +16,7 @@
 ;; a TypeDecl is one of
 ;;   - (type-alias-decl Type)
 ;;   - (newtype-decl Id Type)
+;;   - (type-opaque-decl)
 
 (struct type-alias-decl [type] #:prefab)
 (struct newtype-decl [id type]
@@ -24,6 +25,7 @@
   ; NOTE: don't substitute for type during subtype relation
   ;       newtype =/= type alias !
   #:prefab)
+(struct type-opaque-decl [] #:prefab)
 
 ;; a DeclKindEnv is a [Lenvof DeclKind]
 
@@ -52,12 +54,13 @@
 ;; a Type is one of
 ;;   - BaseType
 ;;   - (Arrow [Listof Type] Type)
+;;   - (Forall [Listof Label] Type)
 ;;   - (label-reference Label)
-;;   - TODO: ∀
 
 (struct Int [] #:prefab)
 (struct Bool [] #:prefab)
 (struct Arrow [inputs output] #:prefab)
+(struct Forall [labels body] #:prefab)
 (struct label-reference [label] #:prefab)
 
 (define (subtype? G τ1 τ2)
@@ -70,6 +73,19 @@
      (define (<: a b) (recur-subtype? G a b))
      (and (andmap <: τb-ins τa-ins)
           (<: τa-out τb-out))]
+
+    [[(Forall Xs τa-body) (Forall Ys τb-body)]
+     (define common-labels
+       (map fresh-label Xs))
+     (define G+common
+       (label-env-extend
+        G
+        (map (λ (x) (list x (type-binding (type-opaque-decl))))
+             common-labels)))
+     (and (= (length Xs) (length Ys))
+          (let ([τa-body* (type-substitute-label* G Xs common-labels)]
+                [τb-body* (type-substitute-label* G Ys common-labels)])
+          (recur-subtype? G+common τa-body* τb-body*)))]
 
     ;; two identical label-reference types are equal; this handles the case of
     ;; two opaque types as well as preemtively matching aliases that
@@ -130,6 +146,24 @@
     [(Arrow ins out)
      (Arrow (map ttlr-f ins)
             (ttlr-f out))]
+    [(Forall ls body)
+     (Forall ls (ttlr-f body))]
     ;; TODO: how do we know whether τ contains a
     ;; label-reference or not?
     [_ τ]))
+
+;; type-substitute-label* :
+;; Type [Listof Label] [Listof Label] -> Type
+(define (type-substitute-label* τ Xs-old Xs-new)
+  (define mapping
+    (make-immutable-hash (map cons Xs-old Xs-new)))
+  (type-label-reference-map (λ (X) (hash-ref mapping X X)) τ))
+
+;; type-substitute* :
+;; Type [Listof Label] [Listof Type] -> Type
+(define (type-substitute* τ Xs-old τs-new)
+  (define mapping
+    (make-immutable-hash (map cons Xs-old τs-new)))
+  (type-transform-label-reference
+   τ
+   (λ (X) (hash-ref mapping X (label-reference X)))))

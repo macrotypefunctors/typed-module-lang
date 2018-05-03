@@ -46,7 +46,7 @@
 ;;  - (mod-decl Signature)
 
 ; type-alias-decl from "type.rkt"
-(struct type-opaque-decl [] #:prefab)
+; type-opaque-decl from "type.rkt"
 (struct val-decl [type] #:prefab)
 (struct mod-decl [type] #:prefab)
 

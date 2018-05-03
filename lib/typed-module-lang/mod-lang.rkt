@@ -341,7 +341,8 @@
    (er ⊢m≫sig⇒ ≫ #'(λ (x) body-module-) sig⇒ (pi-sig x-label A B))]
   [else
    #:with (_ . rst) this-syntax
-   #'(core-lambda . rst)])
+   (syntax/loc this-syntax
+     (core-lambda . rst))])
 
 ;; --------------------------------------------------------------
 
@@ -356,7 +357,7 @@
      (unless (signature-matches? G A* A)
        (raise-syntax-error #f
          (format "signature mismatch\n  expected: ~a\n  given:    ~a"
-                 (sig->string A) (sig->string A*))
+                 (sig->string G A) (sig->string G A*))
          #'arg))
      (define B* (signature-subst B x (attribute arg.path)))
      (er ⊢m≫sig⇒ ≫ #'(fun- arg-)

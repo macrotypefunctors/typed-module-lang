@@ -1,4 +1,4 @@
-#lang s-exp typed-module-lang/mod-lang
+#lang typed-module-lang
 
 (define-signature S =
   (sig
@@ -29,7 +29,7 @@
    (type Bool)
    (type Nat)
    (val z : Nat)
-   (val z? : Bool)
+   (val z? : (-> Nat Bool))
    (val add1 : (-> Nat Nat))
    ;; sub1 raises an error if its argument is z
    (val sub1 : (-> Nat Nat))))
@@ -48,9 +48,10 @@
   (seal
    (mod
     (type Bool = (∀ (X) (-> (-> X) (-> X) X)))
-    (val true = (Λ (X) (λ (t f) (t))))
-    (val false = (Λ (X) (λ (t f) (f))))
-    (val if = (Λ (X) (λ (b t f) (b t f)))))
+    (val true : Bool = (Λ (X) (λ (t f) (t))))
+    (val false : Bool = (Λ (X) (λ (t f) (f))))
+    (val if : (∀ (X) (-> Bool (-> X) (-> X) X)) =
+         (Λ (X) (λ (b t f) ((inst b X) t f)))))
    :>
    BOOL-REP))
 
@@ -60,17 +61,59 @@
      (λ ([N : (where NAT-REP Bool = B.Bool)])
        (mod
         ;; comparison
-        (val = = (λ ([a : N.Nat] [b : N.Nat])
-                   (B.if (N.z? a)
-                         (λ () (N.z? b))
-                         (λ () (B.if (N.z? b)
-                                     (λ () B.false)
-                                     (λ () (= (N.sub1 a) (N.sub1 b))))))))
+        (val = : (-> N.Nat N.Nat B.Bool) =
+             (λ ([a : N.Nat] [b : N.Nat])
+               ((inst B.if B.Bool)
+                (N.z? a)
+                (λ () (N.z? b))
+                (λ () ((inst B.if B.Bool) (N.z? b)
+                                          (λ () B.false)
+                                          (λ () (= (N.sub1 a) (N.sub1 b))))))))
         ;; arithmetic
-        (val + = (λ ([a : N.Nat] [b : N.Nat])
-                   (B.if (N.z? a)
-                         (λ () b)
-                         (λ () (N.add1 (+ (N.sub1 a) b)))))))))
+        (val + : (-> N.Nat N.Nat N.Nat) =
+             (λ ([a : N.Nat] [b : N.Nat])
+               ((inst B.if N.Nat) (N.z? a)
+                                  (λ () b)
+                                  (λ () (N.add1 (+ (N.sub1 a) b)))))))))
    :>
    NAT))
+
+(define-module Nat-Rep/Int =
+  (seal
+   (mod (type Bool = Bool-Rep.Bool)
+        (type Nat = Int)
+        (val z : Nat = 0)
+        (val z? : (-> Nat Bool) = (λ (x) (if (= x 0) Bool-Rep.true Bool-Rep.false)))
+        (val add1 : (-> Nat Nat) = (λ (x) (+ x 1)))
+        ;; sub1 raises an error if its argument is z
+        (val sub1 : (-> Nat Nat) = (λ (x) (- x 1))))
+   :>
+   (where NAT-REP Bool = Bool-Rep.Bool)))
+    
+(define-module Nat/Int =
+  ((Nat Bool-Rep) Nat-Rep/Int))
+
+(define-module TestNat =
+  (λ ([NR : (where NAT-REP Bool = Bool-Rep.Bool)])
+    (mod
+     (define-module N = ((Nat Bool-Rep) NR))
+     (type Bool = Bool-Rep.Bool)
+     (type Nat = NR.Nat)
+     (val true : Bool = Bool-Rep.true)
+     (val false : Bool = Bool-Rep.false)
+     (val n0 : Nat = NR.z)
+     (val n1 : Nat = (NR.add1 n0))
+     (val n2 : Nat = (NR.add1 n1))
+     (val n3 : Nat = (NR.add1 n2))
+     (val n4 : Nat = (NR.add1 n3))
+     (val n5 : Nat = (NR.add1 n4))
+     (val n6 : Nat = (NR.add1 n5))
+     (val n7 : Nat = (NR.add1 n6))
+     (val n8 : Nat = (NR.add1 n7))
+     (val n9 : Nat = (NR.add1 n8))
+
+     (check (N.= (N.+ n3 n5) n8) = Bool-Rep.true))))
+
+(define-module TestNat/Int =
+  (TestNat Nat-Rep/Int))
 

@@ -57,6 +57,9 @@
     [(Bool) 'Bool]
     [(Arrow ins out)
      `(-> ,@(map rc ins) ,(rc out))]
+    [(Forall Xs body)
+     (define env* (label-env-extend env (map list Xs Xs)))
+     `(∀ ,Xs ,(rec env* body))]
     ;; signatures
     [(? sig? s)
      (define env*

@@ -2,7 +2,7 @@
 
 (provide (for-syntax core-lang-tc-passes)
          ; types
-         Int Bool ->
+         Int Bool -> ∀
          ; forms
          val
          type
@@ -16,6 +16,8 @@
           [core-lang-lambda λ]
           [core-lang-let let]
           [core-lang-if if]
+          [core-lang-Λ Λ]
+          [core-lang-inst inst]
           ;; prim ops
           [core-lang-+ +]
           [core-lang-- -]
@@ -60,6 +62,15 @@
    (define ins (map expand-type (attribute in*)))
    (define out (expand-type #'out*))
    (type-stx (Arrow ins out))])
+
+(define-typed-syntax ∀
+  [⊢τ≫type⇐
+   [dke ⊢τ #'(_ (x:id ...) body*:expr)]
+   (define body-dke
+     (extend dke (map (λ (x) (list x 'type)) (attribute x))))
+   (define x-labels (map (λ (x) (lookup-label body-dke x)) (attribute x)))
+   (define body (expand-type/dke body-dke #'body*))
+   (type-stx (Forall x-labels body))])
 
 ;; ----------------------------------------------------
 
@@ -246,21 +257,45 @@
    (er ⊢e≫⇒ ≫ #''b ⇒ (Bool))])
 
 (begin-for-syntax
-  ;; traverses type aliases until an Arrow type is found.
-  ;; Env Type -> Arrow or #f
-  (define (find-arrow-type G τ)
+  ;; follows type aliases until a non-alias type is found, and returns it
+  ;; Env Type -> Type
+  (define (dereference-type G τ)
     (match τ
-      [(Arrow _ _) τ]
       [(label-reference x)
        (match (lenv-lookup-type-decl (env-label-env G) x)
-         [(type-alias-decl τ*) (find-arrow-type G τ*)]
-         [_ #f])]
-      [_ #f])))
+         [(type-alias-decl τ*) (dereference-type G τ*)]
+         [_ τ])]
+      [_ τ]))
+
+  ;; follows type aliases until an Arrow type is found, or raises a syntax
+  ;; error on the given syntax if not found
+  ;; Stx Env Type -> ArrowType
+  (define (find-arrow-type stx G τ)
+    (define τ* (dereference-type G τ))
+    (if (Arrow? τ*)
+        τ*
+        (raise-syntax-error #f
+          (format "expected function type, got ~a"
+                  (type->string G τ))
+          stx)))
+
+  ;; like find-arrow-type but looks for Forall types
+  ;; Stx Env Type -> ForallType
+  (define (find-forall-type stx G τ)
+    (define τ* (dereference-type G τ))
+    (if (Forall? τ*)
+        τ*
+        (raise-syntax-error #f
+          (format "expected forall type, got ~a"
+                  (type->string G τ))
+          stx)))
+  
+  )
 
 (define-typed-syntax core-lang-lambda
   [⊢e≫⇐
    [G ⊢e #'(_ (x:id ...) body:expr) ⇐ τ_expected]
-   (match-define (Arrow τ_as τ_b) (find-arrow-type G τ_expected))
+   (match-define (Arrow τ_as τ_b) (find-arrow-type this-syntax G τ_expected))
    (define body-G
      (extend G
              (map list (attribute x) (map val-binding τ_as))))
@@ -288,12 +323,7 @@
    [G ⊢e #'(_ fn:expr arg:expr ...)]
    (ec G ⊢e #'fn ≫ #'fn- ⇒ τ-fn)
    ;; extract function type
-   (define-values [τ-ins τ-out]
-     (match (find-arrow-type G τ-fn)
-       [(Arrow i o) (values i o)]
-       [_ (raise-syntax-error #f
-            (format "cannot apply non-function type ~a" (type->string τ-fn))
-            this-syntax)]))
+   (match-define (Arrow τ-ins τ-out) (find-arrow-type #'fn G τ-fn))
    ;; compare # of arguments
    (unless (= (length τ-ins) (length (attribute arg)))
      (raise-syntax-error #f
@@ -337,6 +367,55 @@
    (ec G ⊢e #'thn ≫ #'thn- ⇒ τ)
    (ec G ⊢e #'els ≫ #'els- ⇐ τ)
    (er ⊢e≫⇒ ≫ #'(if que- thn- els-) ⇒ τ)])
+
+(define-typed-syntax core-lang-Λ
+  [⊢e≫⇒
+   [G ⊢e #'(_ (X:id ...) body:expr)]
+   (define body-G
+     (extend G
+             (for/list ([X (in-list (attribute X))])
+               (list X (type-binding (type-opaque-decl))))))
+   (define X-labels
+     (map (λ (X) (lookup-label body-G X))
+          (attribute X)))
+   (ec body-G ⊢e #'body ≫ #'body- ⇒ τ_b)
+   (er ⊢e≫⇒ ≫ #'body- ⇒ (Forall X-labels τ_b))]
+
+  [⊢e≫⇐
+   [G ⊢e #'(_ (X:id ...) body:expr) ⇐ τ_exp]
+   (match-define (Forall Y-labels τ_b) (find-forall-type this-syntax G τ_exp))
+   (define body-G
+     (extend G
+             (for/list ([X (in-list (attribute X))])
+               (list X (type-binding (type-opaque-decl))))))
+   (define X-labels
+     (map (λ (X) (lookup-label body-G X))
+          (attribute X)))
+   (define τ_b*
+     (type-substitute-label* τ_b Y-labels X-labels))
+   ;; τ_b* has the X-labels
+   (ec body-G ⊢e #'body ≫ #'body- ⇐ τ_b*)
+   (er ⊢e≫⇐ ≫ #'body-)])
+
+(define-typed-syntax core-lang-inst
+  [⊢e≫⇒
+   [G ⊢e #'(_ e:expr t_arg:expr ...)]
+   
+   (define dke G)
+   (define (expand-type τ-stx)
+     (expand-type/dke dke τ-stx))
+   (define τ_args
+     (map expand-type (attribute t_arg)))
+   
+   (ec G ⊢e #'e ≫ #'e- ⇒ τ_e)
+   (match-define (Forall Xs τ_inside) (find-forall-type #'e G τ_e))
+   (unless (= (length Xs) (length τ_args))
+     (raise-syntax-error #f
+       "wrong number of arguments to forall type"
+       this-syntax))
+   
+   (define τ (type-substitute* τ_inside Xs τ_args))
+   (er ⊢e≫⇒ ≫ #'e- ⇒ τ)])
 
 ;; ---------------------------------------------------------
 

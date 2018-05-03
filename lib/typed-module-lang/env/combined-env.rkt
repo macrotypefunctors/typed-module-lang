@@ -47,19 +47,22 @@
      bs
      (for/list ([ent (in-list entries)]
                 [lab (in-list labels)])
-       (list (first ent) lab))))
+       (match-define (list id _) ent)
+       (list id lab))))
   (define le*
     (label-env-extend
      le
      (for/list ([ent (in-list entries)]
                 [lab (in-list labels)])
-       (list lab (second ent)))))
+       (match-define (list _ val) ent)
+       (list lab val))))
   (define ne*
     (label-env-extend
      ne
      (for/list ([ent (in-list entries)]
                 [lab (in-list labels)])
-       (list lab (syntax-e (first ent))))))
+       (match-define (list id _) ent)
+       (list lab (syntax-e id)))))
   (env bs* le* ne*))
 
 ;; Env Bindings -> Env

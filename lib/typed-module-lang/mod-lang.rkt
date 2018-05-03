@@ -39,7 +39,6 @@
                      "sig.rkt"
                      "type.rkt"
                      "env/combined-env.rkt"
-                     "env/label-env.rkt"
                      "print/print-type.rkt"
                      "print/print-env.rkt"
                      "util/for-acc.rkt"))
@@ -324,8 +323,8 @@
   [⊢s≫signature⇐
    [external-G ⊢s #'(_ ([x:id : A-stx]) B-stx)]
    (define A (expand-signature external-G #'A-stx))
-   (define x-label (fresh-label #'x))
-   (define body-G (extend external-G (list (list #'x x-label (mod-binding A)))))
+   (define body-G (extend external-G (list (list #'x (mod-binding A)))))
+   (define x-label (lookup-label body-G #'x))
    (define B (expand-signature body-G #'B-stx))
    (type-stx (pi-sig x-label A B))])
 
@@ -336,8 +335,8 @@
   [⊢m≫sig⇒
    [G ⊢m #'(_ ([x:id : A-stx]) body-module:expr)]
    (define A (expand-signature G #'A-stx))
-   (define x-label (fresh-label #'x))
-   (define body-G (extend G (list (list #'x x-label (mod-binding A)))))
+   (define body-G (extend G (list (list #'x (mod-binding A)))))
+   (define x-label (lookup-label body-G #'x))
    (ec body-G ⊢m #'body-module ≫ #'body-module- sig⇒ B)
    (er ⊢m≫sig⇒ ≫ #'(λ (x) body-module-) sig⇒ (pi-sig x-label A B))]
   [else

@@ -1,18 +1,20 @@
 #lang agile
 
-(provide print-env)
+(provide print-bindings)
 
 (require racket/pretty
          "../type.rkt"
          "../sig.rkt"
+         "../env/combined-env.rkt"
          "print-type.rkt"
          (submod "print-type.rkt" private))
 
-(define (print-env G [out (current-output-port)])
+(define (print-bindings env bindings [out (current-output-port)])
   (define rename-env
-    (for/hash ([entry (in-list G)])
-      (values (second entry) (syntax-e (first entry)))))
-  (for ([entry (in-list (reverse G))])
+    (for/hash ([entry (in-list bindings)])
+      (define label (lookup-label env (first entry)))
+      (values label (syntax-e (first entry)))))
+  (for ([entry (in-list (reverse bindings))])
     (pretty-write
      (convert rename-env entry)
      out)))
@@ -24,7 +26,7 @@
      (apply fprintf out str vs))])
 
 (define (convert rnm-env entry)
-  (match-define (list x-id label binding) entry)
+  (match-define (list x-id binding) entry)
   (define x (syntax-e x-id))
   (match binding
     [(val-binding τ) (fmt "val ~s : ~s" (list x (->s-expr rnm-env τ)))]

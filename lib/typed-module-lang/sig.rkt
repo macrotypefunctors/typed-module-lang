@@ -38,3 +38,15 @@
   (match-define (env bs le) G)
   (lsignature-matches? le s1 s2))
 
+;; Env Bindings -> Sig
+;; The identifiers in the lhs's of module-bindings are *reference* positions
+;; in the env.
+(define (module-bindings->sig env module-bindings)
+  (for/hash ([p (in-list module-bindings)])
+    (match-define (list id binding) p)
+    (define label (lookup-label env id))
+    (define entry (env-binding->sig-entry binding))
+    ;; convert identifiers into symbols for the outside names
+    ;; for the signature
+    (values (syntax-e id) (sig-component label entry))))
+

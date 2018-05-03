@@ -478,25 +478,19 @@ M.L.T4 = (alias M.J.D)
 
 ;; Converting internal type environments to "external" signatures
 
-(provide module-bindings->sig)
+(provide env-binding->sig-entry)
 
-;; [Listof [List Id Label EnvBinding]] -> Sig
-(define (module-bindings->sig module-bindings)
-  (for/hash ([p (in-list module-bindings)])
-    (match-define (list id label binding) p)
-    (define decl
-      (match binding
-        [(val-binding τ) (val-decl τ)]
-        [(type-binding decl)
-         (match decl
-           [(type-alias-decl τ) (type-alias-decl τ)]
-           [(type-opaque-decl) decl])]
+;; EnvBinding -> SigEntry
+(define (env-binding->sig-entry binding)
+  (match binding
+    [(val-binding τ) (val-decl τ)]
+    [(type-binding decl)
+     (match decl
+       [(type-alias-decl τ) (type-alias-decl τ)]
+       [(type-opaque-decl) decl])]
 
-        [(mod-binding sig)
-         (mod-decl sig)]))
-    ;; convert identifiers into symbols for the outside names
-    ;; for the signature
-    (values (syntax-e id) (sig-component label decl))))
+    [(mod-binding sig)
+     (mod-decl sig)]))
 
 ;; -----------------------------------------------------
 

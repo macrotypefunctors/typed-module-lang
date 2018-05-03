@@ -67,11 +67,20 @@
 
 (begin-for-syntax
   ;; core-lang-tc-passes :
-  ;; Env [Listof Stx] -> (values [Listof Stx] Bindings)
-  ;; the envl returned is *not* an extension of external-G, it
-  ;; is collection of new bindings introduced by the declarations.
+  ;; Env [Listof Stx] -> (values [Listof Stx] Env Bindings)
+  ;; Returns 3 values:
+  ;;  * expanded-decls : [Listof Stx]
+  ;;    A list of the expanded declarations
+  ;;  * inside-env     : Env
+  ;;    The environment inside the program, determines what the *labels* are
+  ;;  * bindings       : Bindings
+  ;;    A list of the new bindings introduced by the declarations.
+  ;;    The identifiers in the lhs's of these bindings are *reference*
+  ;;    positions, which have labels in the binding store of the inside-env.
   (define (core-lang-tc-passes external-G ds)
     ;; pass 1
+    ;; the identifiers produced here in the dkel are binding positions
+    ;; or "definitions"
     (define-values [dkel ds/1]
       (for/list/acc ([dkel '()])
                     ([d (in-list ds)])
@@ -85,8 +94,10 @@
               (for/list ([ent (in-list dkel)])
                 (match ent
                   [(list k v)
-                   (list (syntax-local-introduce k) (fresh-label k) v)]))))
+                   (list (syntax-local-introduce k) v)]))))
     ;; pass 2
+    ;; the identifiers produced here in the envl are reference positions
+    ;; or "uses"
     (define-values [envl ds/2]
       (for/list/acc ([Gl '()])
                     ([d (in-list ds/1)])
@@ -97,28 +108,25 @@
       (for/list ([ent (in-list envl)])
         (match ent
           [(list k v)
-           (define k* (syntax-local-introduce k))
-           (list k*
-                 (lookup-label dke+external k*)
-                 v)])))
+           (list (syntax-local-introduce k) v)])))
     (define env+external
       ;; note: important that 'envl' entries are "closer"
       ;;   than entries in 'external-G'
-      (extend external-G envl*))
+      (replace dke+external envl*))
     ;; pass 3
     (define ds/3
       (for/list ([d (in-list ds/2)])
         (ec env+external ⊢ d ≫ d- val-def⇐)
         d-))
     ; note: return just 'envl', not 'env+external' (see purpose statement)
-    (values ds/3 envl*)))
+    (values ds/3 env+external envl*)))
 
 (define-syntax core-lang-module-begin
   (syntax-parser
     [(_ d:expr ...)
-     (define-values [ds- Gl]
+     (define-values [ds- env bindings]
        (core-lang-tc-passes (empty-env) (attribute d)))
-     (print-env Gl)
+     (print-bindings env bindings)
      #`(#%module-begin #,@ds-)]))
 
 ;; ----------------------------------------------------
@@ -255,10 +263,7 @@
    (match-define (Arrow τ_as τ_b) (find-arrow-type G τ_expected))
    (define body-G
      (extend G
-             (map list
-                  (attribute x)
-                  (map fresh-label (attribute x))
-                  (map val-binding τ_as))))
+             (map list (attribute x) (map val-binding τ_as))))
    (ec body-G ⊢e #'body ≫ #'body- ⇐ τ_b)
    (er ⊢e≫⇐ ≫ #`(lambda (x ...) body-))]
   [⊢e≫⇒
@@ -271,10 +276,7 @@
    (define τ_xs (map expand-type (attribute τ-stx)))
    (define body-G
      (extend G
-             (map list
-                  (attribute x)
-                  (map fresh-label (attribute x))
-                  (map val-binding τ_xs))))
+             (map list (attribute x) (map val-binding τ_xs))))
    (ec body-G ⊢e #'body ≫ #'body- ⇒ τ_body)
    (er ⊢e≫⇒ ≫ #`(lambda (x ...) body-) ⇒ (Arrow τ_xs τ_body))])
 
@@ -318,10 +320,7 @@
    #:with [e- ...] es-
    (define body-G
      (extend G
-             (map list
-                  (attribute x)
-                  (map fresh-label (attribute x))
-                  (map val-binding τ_xs))))
+             (map list (attribute x) (map val-binding τ_xs))))
    (ec body-G ⊢e #'body ≫ #'body- ⇒ τ_b)
    (er ⊢e≫⇒ ≫ #`(let ([x e-] ...) body-) ⇒ τ_b)])
 

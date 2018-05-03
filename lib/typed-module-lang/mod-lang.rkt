@@ -33,7 +33,6 @@
                      racket/match
                      racket/pretty
                      racket/syntax
-                     unstable/match
                      macrotypes-nonstx/type-prop
                      (only-in syntax/parse [attribute @])
                      "type-check.rkt"
@@ -51,42 +50,61 @@
 
 (begin-for-syntax
   ;; mod-body-tc-passes :
-  ;; Env [Listof Stx] -> (values [Listof Stx] Bindings)
+  ;; Env [Listof Stx] -> (values [Listof Stx] Env Bindings)
+  ;; Returns 3 values:
+  ;;  * expanded-decls : [Listof Stx]
+  ;;    A list of the expanded declarations
+  ;;  * inside-env     : Env
+  ;;    The environment inside the program, determines what the *labels* are
+  ;;  * bindings       : Bindings
+  ;;    A list of the new bindings introduced by the declarations.
+  ;;    The identifiers in the lhs's of these bindings are *reference*
+  ;;    positions, which have labels in the binding store of the inside-env.
   (define (mod-body-tc-passes external-G ds)
-    (define-values [module-bindings ds/0]
-      (for/list/acc ([Gl '()])
+    (define-values [G+modules module-bindings ds/0]
+      (for/list/acc ([G external-G]
+                     [Gl '()])
                     ([d (in-list ds)])
-        (define G+external (extend external-G Gl))
-        (ec G+external ⊢md d ≫ d- submoddef⇒ Gl+)
+        (ec G ⊢md d ≫ d- submoddef⇒ Gl+)
         (define Gl*
           (for/list ([ent (in-list Gl+)])
             (match ent
               [(list k v)
-               (list (syntax-local-introduce k) (fresh-label k) v)])))
-        (values (append Gl* Gl)
+               (list (syntax-local-introduce k) v)])))
+        (values (extend G Gl*)
+                (append Gl* Gl)
                 d-)))
-    (define G+modules (extend external-G module-bindings))
-    (define-values [ds/1234 module-envl]
+    (define-values [ds/1234 inside-env module-envl]
       (core-lang-tc-passes G+modules ds/0))
-    (values ds/1234 (append module-envl module-bindings)))
+    (values ds/1234 inside-env (append module-envl module-bindings)))
 
   ;; mod-lang-sc-passes :
-  ;; [Listof Stx] -> (values [Listof Stx] Bindings)
+  ;; [Listof Stx] -> (values [Listof Stx] Env Bindings)
+  ;; Returns 3 values:
+  ;;  * expanded-decls : [Listof Stx]
+  ;;    A list of the expanded declarations
+  ;;  * inside-env     : Env
+  ;;    The environment inside the program, determines what the *labels* are
+  ;;  * bindings       : Bindings
+  ;;    A list of the new bindings introduced by the declarations.
+  ;;    The identifiers in the lhs's of these bindings are *reference*
+  ;;    positions, which have labels in the binding store of the inside-env.
   (define (mod-lang-sc-passes ds)
     (define external (empty-env))
-    (define-values [envl ds/1]
-      (for/list/acc ([Gl '()])
+    (define-values [inside-env envl ds/1]
+      (for/list/acc ([G external]
+                     [Gl '()])
                     ([d (in-list ds)])
-        (define G+external (extend external Gl))
-        (ec G+external ⊢md d ≫ d- modsigdef⇒ Gl+)
+        (ec G ⊢md d ≫ d- modsigdef⇒ Gl+)
         (define Gl*
           (for/list ([ent (in-list Gl+)])
             (match ent
               [(list k v)
-               (list (syntax-local-introduce k) (fresh-label k) v)])))
-        (values (append Gl* Gl)
+               (list (syntax-local-introduce k) v)])))
+        (values (extend G Gl*)
+                (append Gl* Gl)
                 d-)))
-    (values ds/1 envl)))
+    (values ds/1 inside-env envl)))
 
 ;; The module-begin form.
 ;; For now, expect a series of define-module forms
@@ -95,9 +113,9 @@
 (define-syntax mod-lang-module-begin
   (syntax-parser
     [(_ d:expr ...)
-     (define-values [ds- bindings]
+     (define-values [ds- env bindings]
        (mod-lang-sc-passes (@ d)))
-     (print-env bindings)
+     (print-bindings env bindings)
      #`(#%module-begin #,@ds-)]))
 
 ;; --------------------------------------------------------------
@@ -217,14 +235,14 @@
    ;; include bindings from the external-G
    #:with name (generate-temporary 'mod)
    #:do [(define intro (make-syntax-introducer #t))
-         (define-values [ds- module-bindings]
+         (define-values [ds- env module-bindings]
            (mod-body-tc-passes external-G (map intro (@ d))))
          ;; TODO: include the type-env too
          ;; TODO: determine if the above comment is still relevant?
-         (define module-sig (module-bindings->sig module-bindings))]
+         (define module-sig (module-bindings->sig env module-bindings))]
    #:with [x ...] (for/list ([entry (in-list module-bindings)]
-                             #:when (or (val-binding? (third entry))
-                                        (mod-binding? (third entry))))
+                             #:when (or (val-binding? (second entry))
+                                        (mod-binding? (second entry))))
                     (first entry))
    #:with [[k/v ...] ...]
    #'[['x x] ...]
@@ -272,19 +290,18 @@
                    ([x (in-list (@ mod-name))]
                     [sig-stx (in-list (@ mod-sig))])
        (define sig (expand-signature G sig-stx))
-       (values (extend G (list (list x (fresh-label x) (mod-binding sig))))
+       (values (extend G (list (list x (mod-binding sig))))
                sig)))
 
-   (define dke
-     ;; TODO: check for duplicate identifiers
-     (append (map (λ (x s) (list x (fresh-label x) (mod-binding s))) (@ mod-name) sigs)
-             (map (λ (x) (list x (fresh-label x) 'type)) (@ alias-name))
-             (map (λ (x) (list x (fresh-label x) 'type)) (@ opaque-name))
-             (map (λ (x) (list x (fresh-label x) 'val)) (@ val-name))))
+   ;; TODO: check for duplicate identifiers, including with modules
 
    (define dke+external-G
      ;; the things in the dke are "closer"
-     (extend external-G dke))
+     (extend G+modules
+             (append
+              (map (λ (x) (list x 'type)) (@ alias-name))
+              (map (λ (x) (list x 'type)) (@ opaque-name))
+              (map (λ (x) (list x 'val)) (@ val-name)))))
 
    (define (expand-type type-stx)
      (expand-type/dke dke+external-G type-stx))
@@ -292,15 +309,13 @@
    (define val-τs   (map expand-type (@ val-type)))
    (define alias-τs (map expand-type (@ alias-type)))
 
-   (define (label x)
-     (lookup-label dke+external-G x))
-
    (type-stx
     (module-bindings->sig
-     (append (map list (@ mod-name) (map label (@ mod-name)) (map mod-binding sigs))
-             (map list (@ val-name) (map label (@ val-name)) (map val-binding val-τs))
-             (map list (@ alias-name) (map label (@ alias-name)) (map (compose type-binding type-alias-decl) alias-τs))
-             (map list (@ opaque-name) (map label (@ opaque-name)) (map (const (type-binding (type-opaque-decl))) (@ opaque-name))))))])
+     dke+external-G
+     (append (map list (@ mod-name) (map mod-binding sigs))
+             (map list (@ val-name) (map val-binding val-τs))
+             (map list (@ alias-name) (map (compose type-binding type-alias-decl) alias-τs))
+             (map list (@ opaque-name) (map (const (type-binding (type-opaque-decl))) (@ opaque-name))))))])
 
 ;; --------------------------------------------------------------
 

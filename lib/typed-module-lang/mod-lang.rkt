@@ -260,8 +260,8 @@
    ;; TODO: smaller error messages that say something like
    ;;       "this component is missing" or "this component has the wrong type"
    (format "signature mismatch:\n  expected: ~a\n  given:    ~a\n"
-           (sig->string s-expected)
-           (sig->string s-actual))
+           (sig->string external-G s-expected)
+           (sig->string external-G s-actual))
    (er ⊢m≫sig⇒
        ≫ #'m-
        sig⇒ s-expected)])

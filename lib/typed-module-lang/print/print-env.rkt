@@ -10,13 +10,10 @@
          (submod "print-type.rkt" private))
 
 (define (print-bindings env bindings [out (current-output-port)])
-  (define rename-env
-    (for/hash ([entry (in-list bindings)])
-      (define label (lookup-label env (first entry)))
-      (values label (syntax-e (first entry)))))
+  (define name-env (env-name-env env))
   (for ([entry (in-list (reverse bindings))])
     (pretty-write
-     (convert rename-env entry)
+     (convert name-env entry)
      out)))
 
 (struct fmt [str vs] #:transparent

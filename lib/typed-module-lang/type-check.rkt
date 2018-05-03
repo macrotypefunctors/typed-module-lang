@@ -113,8 +113,8 @@
    (unless (type-matches? G τ-actual τ-expected)
      (raise-syntax-error #f
        (format "type mismatch\n  expected: ~a\n  given:    ~a"
-               (type->string τ-expected)
-               (type->string τ-actual))
+               (type->string G τ-expected)
+               (type->string G τ-actual))
        expr))
    (er ⊢e≫⇐ ≫ expr-)])
 

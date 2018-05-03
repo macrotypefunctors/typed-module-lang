@@ -6,6 +6,7 @@
 (require racket/pretty
          "../type.rkt"
          "../sig.rkt"
+         "../env/combined-env.rkt"
          "../env/label-env.rkt")
 
 (module+ private
@@ -14,13 +15,13 @@
 
 ;; ---------------------------------------------------------
 
-(define (type->string τ)
-  (define env (empty-label-env))
-  (pretty-format (->s-expr env τ) #:mode 'write))
+(define (type->string env τ)
+  (define ne (env-name-env env))
+  (pretty-format (->s-expr ne τ) #:mode 'write))
 
-(define (sig->string τ)
-  (define env (empty-label-env))
-  (pretty-format (->s-expr env τ) #:mode 'write))
+(define (sig->string env τ)
+  (define ne (env-name-env env))
+  (pretty-format (->s-expr ne τ) #:mode 'write))
 
 ;; ---------------------------------------------------------
 
@@ -37,7 +38,7 @@
 
 ;; ---------------------------------------------------------
 
-;; An Env is a [LabelEnvof Symbol]
+;; A NameEnv is a [LabelEnvof Symbol]
 ;; maps identifiers to their *external*-ly seen names
 
 (define (->s-expr env τ)

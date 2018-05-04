@@ -2,11 +2,12 @@
 
 (provide (for-syntax core-lang-tc-passes)
          ; types
-         Int Bool -> ∀
+         Int Bool -> ∀ =>
          ; forms
          val
          type
          newtype
+         class
          check
          #%var
          (rename-out
@@ -19,6 +20,7 @@
           [core-lang-if if]
           [core-lang-Λ Λ]
           [core-lang-inst inst]
+          [core-lang-resolve resolve]
           ;; prim ops
           [core-lang-+ +]
           [core-lang-- -]
@@ -73,6 +75,27 @@
    (define x-labels (map (λ (x) (lookup-label body-dke x)) (attribute x)))
    (define body (expand-type/dke body-dke #'body*))
    (type-stx (Forall x-labels body))])
+
+(define-typed-syntax =>
+  [⊢τ≫type⇐
+   [dke ⊢τ #'(_ (class-name:id con*:expr) body*:expr)]
+   (define class (label-reference (lookup-label dke #'class-name)))
+   (define con  (expand-type/dke dke #'con*))
+   (define body (expand-type/dke dke #'body*))
+   (type-stx (Qual (constraint class con) body))]
+
+  [⊢e≫⇒
+   [G ⊢e #'(_ (class-name:id con-type:expr) body:expr)]
+   (define class (label-reference (lookup-label G #'class-name)))
+   (define dke G)
+   (define τ_con (expand-type/dke dke #'con-type))
+   (define dict-id (generate-temporary #'inst))
+   (define G+instance
+     (extend G (list (list dict-id (instance-binding class τ_con)))))
+   (ec G+instance ⊢e #'body ≫ #'body- ⇒ τ_b)
+   (er ⊢e≫⇒ ≫ #'(λ (dict-id) body-)
+       ⇒ (Qual (constraint class τ_con) τ_b))])
+
 
 ;; ----------------------------------------------------
 
@@ -225,6 +248,59 @@
    [_ ⊢ #'(_ X:id = (constr:id core-type))]
    (er ⊢≫val-def⇐ ≫ #'(define constr identity))])
 
+(begin-for-syntax
+  (define-syntax-class method-spec
+    #:datum-literals [:]
+    [pattern [name:id : type:expr]]))
+
+(define-typed-syntax class
+  ;; pass 1
+  [⊢≫decl-kinds⇒
+   [⊢ #'(_ (class-name:id var:id) m:method-spec ...)]
+   (er ⊢≫decl-kinds⇒
+       ≫ this-syntax
+       decl-kinds⇒ (list* (list (syntax-local-introduce #'class-name) 'class)
+                          (map (λ (m) (list (syntax-local-introduce m) 'val))
+                               (attribute m.name))))]
+
+  ;; pass 2
+  [⊢≫decl⇒
+   [dke ⊢ #'(_ (class-name:id var:id) m:method-spec ...)]
+   (define dke+var (extend dke (list (list #'var 'type))))
+   (define var-label (lookup-label dke+var #'var))
+   (define class-label (lookup-label dke+var #'class-name))
+   (define (expand-type t) (expand-type/dke dke+var t))
+   (define methods
+     (for/hash ([name (in-list (attribute m.name))]
+                [type (in-list (attribute m.type))])
+       (values (syntax-e name)
+               (expand-type type))))
+   (define method-intros
+     (for/list ([name (in-list (attribute m.name))])
+       (define τ (hash-ref methods (syntax-e name)))
+       (define τ-qual
+         (Forall (list var-label)
+                 (Qual (constraint (label-reference class-label)
+                                   (label-reference var-label))
+                       τ)))
+       (list (syntax-local-introduce name)
+             (val-binding τ-qual))))
+   (er ⊢≫decl⇒
+       ≫ this-syntax
+       decl⇒ (list* (list (syntax-local-introduce #'class-name)
+                          (typeclass-binding var-label methods))
+                    method-intros))]
+
+  ;; pass 3
+  [⊢≫val-def⇐
+   [G ⊢ #'(_ (class-name:id _) m:method-spec ...)]
+   (er ⊢≫val-def⇐ ≫
+       #'(begin
+           (define (m.name dict)
+             (hash-ref dict 'm.name))
+           ...))])
+
+
 (define-for-syntax (prettify/#%dot dat)
   (match dat
     [(list '#%dot x y)
@@ -319,7 +395,18 @@
           (format "expected forall type, got ~a"
                   (type->string G τ))
           stx)))
-  
+
+  ;; like find-arrow-type but looks for Qual types
+  ;; Stx Env Type -> QualType
+  (define (find-qual-type stx G τ)
+    (define τ* (dereference-type G τ))
+    (if (Qual? τ*)
+        τ*
+        (raise-syntax-error #f
+          (format "expected => type, got ~a"
+                  (type->string G τ))
+          stx)))
+
   )
 
 (define-typed-syntax core-lang-lambda
@@ -430,22 +517,45 @@
 (define-typed-syntax core-lang-inst
   [⊢e≫⇒
    [G ⊢e #'(_ e:expr t_arg:expr ...)]
-   
+
    (define dke G)
    (define (expand-type τ-stx)
      (expand-type/dke dke τ-stx))
    (define τ_args
      (map expand-type (attribute t_arg)))
-   
+
    (ec G ⊢e #'e ≫ #'e- ⇒ τ_e)
    (match-define (Forall Xs τ_inside) (find-forall-type #'e G τ_e))
    (unless (= (length Xs) (length τ_args))
      (raise-syntax-error #f
        "wrong number of arguments to forall type"
        this-syntax))
-   
+
    (define τ (type-substitute* τ_inside Xs τ_args))
    (er ⊢e≫⇒ ≫ #'e- ⇒ τ)])
+
+(begin-for-syntax
+  ;; Env Constraint -> Stx or #f
+  (define (lookup-instance G c)
+    (match-define (constraint class τ) c)
+    ;; look for in two places:
+    ;;  - env of original definition of class
+    ;;  - env of original definition of τ
+    #f)
+  )
+
+(define-typed-syntax core-lang-resolve
+  [⊢e≫⇒
+   [G ⊢e #'(_ e:expr)]
+   (ec G ⊢e #'e ≫ #'e- ⇒ τ_e)
+   (match-define (Qual constr τ_inside) (find-qual-type #'e G τ_e))
+   (match (lookup-instance G constr)
+     [#f (raise-syntax-error #f
+           (format "cannot resolve instance ~a"
+                   (constraint->string G constr))
+           #'e)]
+     [inst-id
+      (er ⊢e≫⇒ ≫ #'(#%app e- inst-id) ⇒ τ_inside)])])
 
 ;; ---------------------------------------------------------
 

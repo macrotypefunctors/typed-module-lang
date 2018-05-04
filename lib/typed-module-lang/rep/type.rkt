@@ -27,16 +27,25 @@
 
 
 ;; a DeclKindEnv is a [Lenvof DeclKind]
+;; a DeclKind is one of
+;;   - 'type
+;;   - 'val
+;;   - 'class
+;;   - EnvBinding
 
 ;; a Lenv is a [Lenvof EnvBinding]
 ;; an EnvBinding is one of
 ;;   - (val-binding Type)
 ;;   - (type-binding TypeDecl)
 ;;   - (constructor-binding Type)
+;;   - (typeclass-binding Label [Hashof Symbol Type]) ; argument label, methods
+;;   - (instance-binding Class Type)                  ; class, instantiated type
 
 (struct val-binding [type])
 (struct type-binding [decl])
 (struct constructor-binding val-binding [])
+(struct typeclass-binding [arg methods])
+(struct instance-binding [class type])
 
 ;; Lenv Label -> TypeDecl or #f
 (define (lenv-lookup-type-decl G X)
@@ -56,13 +65,21 @@
 ;;   - BaseType
 ;;   - (Arrow [Listof Type] Type)
 ;;   - (Forall [Listof Label] Type)
+;;   - (Qual Constraint Type)
+;;   - (label-reference Label)
+;; a Constraint is a
+;;   - (constraint Class Type)
+;; a Class is a
 ;;   - (label-reference Label)
 
 (struct Int [] #:prefab)
 (struct Bool [] #:prefab)
 (struct Arrow [inputs output] #:prefab)
 (struct Forall [labels body] #:prefab)
+(struct Qual [constr body] #:prefab)
 (struct label-reference [label] #:prefab)
+
+(struct constraint [class type] #:prefab)
 
 (define (subtype? G τ1 τ2)
   (subtype?/recur G τ1 τ2 subtype?))
@@ -87,6 +104,12 @@
           (let ([τa-body* (type-substitute-label* G Xs common-labels)]
                 [τb-body* (type-substitute-label* G Ys common-labels)])
           (recur-subtype? G+common τa-body* τb-body*)))]
+
+    [[(Qual (constraint con1 τa-con) τa-body) (Qual (constraint con2 τb-con) τb-body)]
+     #:when (label=? con1 con2)
+     (and (recur-subtype? G τa-con τb-con) ; the constrained type is invariant
+          (recur-subtype? G τb-con τa-con)
+          (recur-subtype? G τa-body τb-body))]
 
     ;; two identical label-reference types are equal; this handles the case of
     ;; two opaque types as well as preemtively matching aliases that
@@ -149,6 +172,8 @@
             (ttlr-f out))]
     [(Forall ls body)
      (Forall ls (ttlr-f body))]
+    [(Qual (constraint class con) body)
+     (Qual (constraint (ttlr-f class) (ttlr-f con)) (ttlr-f body))]
     ;; TODO: how do we know whether τ contains a
     ;; label-reference or not?
     [_ τ]))

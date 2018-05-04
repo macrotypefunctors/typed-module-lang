@@ -1,6 +1,7 @@
 #lang racket/base
 
 (provide type->string
+         constraint->string
          sig->string)
 
 (require racket/match
@@ -17,6 +18,11 @@
 ;; ---------------------------------------------------------
 
 (define (type->string env τ)
+  (define ne (env-name-env env))
+  (define le (env-label-env env))
+  (pretty-format (->s-expr ne le τ) #:mode 'write))
+
+(define (constraint->string env τ)
   (define ne (env-name-env env))
   (define le (env-label-env env))
   (pretty-format (->s-expr ne le τ) #:mode 'write))
@@ -66,6 +72,10 @@
                                         (list X (type-binding
                                                  (type-opaque-decl))))))
      `(∀ ,Xs ,(rec ne* le* body))]
+    [(Qual con body)
+     `(=> ,(rc con) ,(rc body))]
+    [(constraint class type)
+     `(,(rc class) ,(rc type))]
     ;; signatures
     [(? sig? s)
      (define ne*

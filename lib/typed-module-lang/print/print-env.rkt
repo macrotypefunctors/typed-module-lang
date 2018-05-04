@@ -50,6 +50,6 @@
                           (make-list (length variants) "~s")
                           "\n  ")
              (cons x variants))])]
+    [(typeclass-binding arg _) (fmt "class (~s ~s) ..." (list x arg))]
     [(mod-binding s) (fmt "module ~s : ~s" (list x (->s-expr ne le s)))]
     [(sig-binding s) (fmt "signature ~s = ~s" (list x (->s-expr ne le s)))]))
-

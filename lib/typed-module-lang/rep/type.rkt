@@ -15,17 +15,16 @@
 
 ;; a TypeDecl is one of
 ;;   - (type-alias-decl Type)
-;;   - (newtype-decl Id Type)
 ;;   - (type-opaque-decl)
+;;   - (data-decl [Listof Label]) ; constructors
+;;   - (constructor-decl Type)    ; constructor type
 
 (struct type-alias-decl [type] #:prefab)
-(struct newtype-decl [id type]
-  ; id is the identifier for the constructor
-  ; type is the argument to the constructor
-  ; NOTE: don't substitute for type during subtype relation
-  ;       newtype =/= type alias !
-  #:prefab)
 (struct type-opaque-decl [] #:prefab)
+
+(struct data-decl [constructors] #:prefab)
+(struct constructor-decl [type] #:prefab)
+
 
 ;; a DeclKindEnv is a [Lenvof DeclKind]
 
@@ -33,9 +32,11 @@
 ;; an EnvBinding is one of
 ;;   - (val-binding Type)
 ;;   - (type-binding TypeDecl)
+;;   - (constructor-binding Type)
 
 (struct val-binding [type])
 (struct type-binding [decl])
+(struct constructor-binding val-binding [])
 
 ;; Lenv Label -> TypeDecl or #f
 (define (lenv-lookup-type-decl G X)

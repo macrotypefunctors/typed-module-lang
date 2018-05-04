@@ -6,6 +6,7 @@
          ; forms
          val
          type
+         newtype
          check
          #%var
          (rename-out
@@ -31,6 +32,7 @@
 (require syntax/parse/define
          macrotypes-nonstx/type-macros
          rackunit
+         racket/function
          (for-syntax racket/base
                      racket/list
                      racket/match
@@ -194,6 +196,34 @@
   [⊢≫val-def⇐
    [_ ⊢ stx]
    (er ⊢≫val-def⇐ ≫ #'(begin))])
+
+(define-typed-syntax newtype
+  #:datum-literals [=]
+  ;; pass 1
+  [⊢≫decl-kinds⇒
+   [⊢ #'(_ X:id = (constr:id core-type))]
+   (er ⊢≫decl-kinds⇒
+       ≫ this-syntax
+       decl-kinds⇒ (list (list (syntax-local-introduce #'X) 'type)
+                         (list (syntax-local-introduce #'constr) 'val)))]
+  ;; pass 2
+  [⊢≫decl⇒
+   [dke ⊢ #'(_ X:id = (constr:id core-type))]
+   (define core-τ (expand-type/dke dke #'core-type))
+   (define X-label (lookup-label dke #'X))
+   (define constr-label (lookup-label dke #'constr))
+   (er ⊢≫decl⇒
+       ≫ this-syntax
+       decl⇒ (list (list (syntax-local-introduce #'X)
+                         (type-binding (data-decl (list constr-label))))
+                   (list (syntax-local-introduce #'constr)
+                         (constructor-binding
+                          (Arrow (list core-τ)
+                                 (label-reference X-label))))))]
+  ;; pass 3
+  [⊢≫val-def⇐
+   [_ ⊢ #'(_ X:id = (constr:id core-type))]
+   (er ⊢≫val-def⇐ ≫ #'(define constr identity))])
 
 (define-for-syntax (prettify/#%dot dat)
   (match dat

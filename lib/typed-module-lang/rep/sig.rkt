@@ -42,6 +42,8 @@
 ;;  - (type-alias-decl Type)
 ;;  - (type-opaque-decl)
 ;;  - (val-decl Type)
+;;  - (data-decl [Listof Label])
+;;  - (constructor-decl Type)
 ;; TODO: newtype-decl
 ;;  - (mod-decl Signature)
 
@@ -249,6 +251,8 @@
       [(type-alias-decl t) (type-alias-decl (type-map-mod->common m->c t))]
       [(type-opaque-decl) entry]
       [(val-decl t) (val-decl (type-map-mod->common m->c t))]
+      [(data-decl ls) (data-decl (map (λ (x) (hash-ref m->c x x)) ls))]
+      [(constructor-decl t) (constructor-decl (type-map-mod->common m->c t))]
       [(mod-decl s) (mod-decl (signature-map-mod->common m->c s))]))
 
   (define (signature-map-mod->common m->c s)
@@ -262,13 +266,6 @@
                (signature-map-mod->common m->c A)
                (signature-map-mod->common m->c B))]))
 
-  (define (sig-entry->env-binding m->c entry)
-    (match entry
-      ;; TODO: submodules
-      [(val-decl t) (val-binding (type-map-mod->common m->c t))]
-      [(mod-decl s) (mod-binding (signature-map-mod->common m->c s))]
-      [comp (type-binding (sig-entry-map-mod->common m->c entry))]))
-
   ;; extend the env with all the components from A
   ;; REMEMBER: the entries in this env are EnvBindings!
   ;;           refer to the definition of Env
@@ -278,7 +275,8 @@
      (for/list ([(A-sym A-comp) (in-hash A)])
        (match-define (sig-component _ A-entry) A-comp)
        (list (hash-ref sym->common A-sym)
-             (sig-entry->env-binding A->common A-entry)))))
+             (sig-entry->env-binding
+              (sig-entry-map-mod->common A->common A-entry))))))
 
   ;; check that all components in B correspond with components in A
   (for/and ([(B-x B-comp) (in-hash B)])
@@ -297,11 +295,22 @@
   (match* [A B]
     [[(val-decl A) (val-decl B)]
      (type-matches? env A B)]
+    [[(constructor-decl A) (val-decl B)]
+     (type-matches? env A B)]
+    [[(constructor-decl A) (constructor-decl B)]
+     ;; have to be exactly the same
+     (type-equal? env A B)]
+    [[(data-decl A) (data-decl B)]
+     ;; lists of labels have to be the same
+     ;; TODO: does order matter?
+     (andmap label=? A B)]
     [[(type-alias-decl A) (type-alias-decl B)]
      (type-equal? env A B)]
     [[(type-opaque-decl) (type-opaque-decl)]
      #true]
     [[(type-alias-decl _) (type-opaque-decl)]
+     #true]
+    [[(data-decl _) (type-opaque-decl)]
      #true]
     [[(mod-decl s-A) (mod-decl s-B)]
      (signature-matches? env s-A s-B)]
@@ -457,7 +466,10 @@ M.L.T4 = (alias M.J.D)
     [(val-decl ty)        (val-decl (qualify-type qenv ty))]
     [(type-alias-decl ty) (type-alias-decl (qualify-type qenv ty))]
     [(mod-decl sig)       (mod-decl (qualify-sig qenv sig))]
-    [(type-opaque-decl)   (type-opaque-decl)]))
+    [(type-opaque-decl)   (type-opaque-decl)]
+    [(data-decl labels)   (data-decl labels)]
+    [(constructor-decl t) (constructor-decl (qualify-type qenv t))]
+    ))
 
 ;; QualEnv Type -> Type
 (define (qualify-type qenv type)
@@ -478,19 +490,28 @@ M.L.T4 = (alias M.J.D)
 
 ;; Converting internal type environments to "external" signatures
 
-(provide env-binding->sig-entry)
+(provide env-binding->sig-entry
+         sig-entry->env-binding)
 
 ;; EnvBinding -> SigEntry
 (define (env-binding->sig-entry binding)
   (match binding
+    ;; constructor-binding must be matched before val-binding
+    [(constructor-binding τ) (constructor-decl τ)]
     [(val-binding τ) (val-decl τ)]
-    [(type-binding decl)
-     (match decl
-       [(type-alias-decl τ) (type-alias-decl τ)]
-       [(type-opaque-decl) decl])]
+    [(type-binding decl) decl]
 
     [(mod-binding sig)
      (mod-decl sig)]))
+
+;; SigEntry -> EnvBinding
+(define (sig-entry->env-binding entry)
+  (match entry
+    ;; TODO: submodules
+    [(constructor-decl t) (constructor-binding t)]
+    [(val-decl t) (val-binding t)]
+    [(mod-decl s) (mod-binding s)]
+    [_ (type-binding entry)]))
 
 ;; -----------------------------------------------------
 
@@ -629,7 +650,48 @@ M.L.T4 = (alias M.J.D)
      (pi x J (sig [v (val-decl (dot (label-reference x) 't))]))
      (pi x J* (sig [v (val-decl (Int))])))
     )
-  #'(void)))
+
+    ;; -------------------------
+    ;; Sigs involving data types
+
+    ;; simple reflexivity, same matches same
+    (check-sig-matches
+     (sig [Bool (data-decl (list True False))]
+          [True (constructor-decl (label-reference Bool))]
+          [False (constructor-decl (label-reference Bool))])
+     (sig [Bool (data-decl (list True False))]
+          [True (constructor-decl (label-reference Bool))]
+          [False (constructor-decl (label-reference Bool))]))
+
+    (check-sig-matches
+     (sig [Bool (data-decl (list True False))]
+          [True (constructor-decl (label-reference Bool))]
+          [False (constructor-decl (label-reference Bool))])
+     (sig [Bool (type-opaque-decl)]
+          [True (val-decl (label-reference Bool))]
+          [False (val-decl (label-reference Bool))]))
+
+    (check-sig-matches
+     (sig [LOI (data-decl (list Empty Cons))]
+          [Empty (constructor-decl (label-reference LOI))]
+          [Cons (constructor-decl (Arrow (list (Int) (label-reference LOI))
+                                         (label-reference LOI)))])
+     (sig [LOI (data-decl (list Empty Cons))]
+          [Empty (constructor-decl (label-reference LOI))]
+          [Cons (constructor-decl (Arrow (list (Int) (label-reference LOI))
+                                         (label-reference LOI)))]))
+
+    (check-sig-matches
+     (sig [LOI (data-decl (list Empty Cons))]
+          [Empty (constructor-decl (label-reference LOI))]
+          [Cons (constructor-decl (Arrow (list (Int) (label-reference LOI))
+                                         (label-reference LOI)))])
+     (sig [LOI (type-opaque-decl)]
+          [Empty (val-decl (label-reference LOI))]
+          [Cons (val-decl (Arrow (list (Int) (label-reference LOI))
+                                 (label-reference LOI)))]))
+
+    #'(void)))
 
 (module+ test
   (require (submod ".." test/ct)

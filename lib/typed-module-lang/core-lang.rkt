@@ -535,14 +535,28 @@
    (er ⊢e≫⇒ ≫ #'e- ⇒ τ)])
 
 (begin-for-syntax
+
+  ;; Env Class Type Class Type -> Bool
+  (define (instance-matches? G
+                             instance-class instance-type
+                             class type)
+    ;; TODO: use a recur variant?
+    (and (class=? G instance-class class)
+         (type=? G instance-type type)))
+
   ;; Env Constraint -> Stx or #f
-  (define (lookup-instance G c)
-    (match-define (constraint class τ) c)
+  (define (lookup-instance G constr)
+    (match-define (constraint c τ) constr)
     ;; look for in two places:
     ;;  - env of original definition of class
     ;;  - env of original definition of τ
-    #f)
-  )
+    (for/or ([x (in-list (env-ids G))])
+      (match (lookup G x)
+        [(instance-binding inst-c inst-τ)
+         ;; TODO: implement chained instances?
+         (and (instance-matches? G inst-c inst-τ c τ)
+              x)]
+        [_ #f]))))
 
 (define-typed-syntax core-lang-resolve
   [⊢e≫⇒

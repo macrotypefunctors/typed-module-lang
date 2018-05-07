@@ -171,6 +171,9 @@
 ;;  - val
 ;;  - type
 ;;  - newtype
+;;  - class
+;;  - instance
+;;  - check
 
 (define-typed-syntax val
   #:datum-literals [: =]
@@ -251,7 +254,11 @@
 (begin-for-syntax
   (define-syntax-class method-spec
     #:datum-literals [:]
-    [pattern [name:id : type:expr]]))
+    [pattern [name:id : type:expr]])
+
+  (define-syntax-class method-impl
+    #:datum-literals [=]
+    [pattern [name:id = body:expr]]))
 
 (define-typed-syntax class
   ;; pass 1
@@ -299,6 +306,56 @@
            (define (m.name dict)
              (hash-ref dict 'm.name))
            ...))])
+
+(define-typed-syntax instance
+  #:datum-literals [=]
+  ;; pass 1
+  [⊢≫decl-kinds⇒ [⊢ stx] (er ⊢≫decl-kinds⇒ ≫ stx decl-kinds⇒ '())]
+
+  ;; pass 2
+  [⊢≫decl⇒
+   [dke ⊢ #'(_ (class-name:id type-constrained:expr)
+               m:method-impl ...)]
+   #:with dict-id (generate-temporary #'class-name)
+   #:do [(define class-label (lookup-label dke #'class-name))
+         (define c (label-reference class-label))
+         (define τ (expand-type/dke dke #'type-constrained))]
+   (er ⊢≫decl⇒
+       ≫ #`(instance dict-id
+                     #:class #,(type-stx c)
+                     #:type #,(type-stx τ)
+                     m ...)
+       decl⇒ (list (list (syntax-local-introduce #'dict-id)
+                         (instance-binding c τ))))]
+
+  ;; pass 3
+  [⊢≫val-def⇐
+   [G ⊢ #'(_ dict-id
+             #:class c-stx
+             #:type τ-stx
+             m:method-impl ...)]
+
+   #:do [;; don't need to use env because types are already expanded
+         ;; 'val' implementation uses similar technique
+         (define c (expand-type #'c-stx))
+         (define τ (expand-type #'τ-stx))
+         (define-values [class-arg class-methods] 'unimplemented)]
+
+   #:with [m.body- ...] (for/list ([m-stx (in-list (attribute m))]
+                                   [m-name (in-list (attribute m.name))]
+                                   [m-body (in-list (attribute m.body))])
+                          (define m-τ
+                            (hash-ref class-methods (syntax-e m-name)
+                                      (λ () (raise-syntax-error #f
+                                              "method not defined in class"
+                                              m-stx))))
+                          (define m-τ*
+                            (type-substitute* m-type (list class-arg) (list τ)))
+                          (ec G ⊢e m-body ≫ m-body- ⇐ m-τ*)
+                          m-body-)
+
+   #:with [[k/v ...] ...] #'[['m.name m.body-] ...]
+   (er ⊢≫val-def⇐ ≫ #'(define dict-id (hash k/v ...)))])
 
 
 (define-for-syntax (prettify/#%dot dat)

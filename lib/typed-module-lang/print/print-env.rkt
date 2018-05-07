@@ -51,5 +51,6 @@
                           "\n  ")
              (cons x variants))])]
     [(typeclass-binding arg _) (fmt "class (~s ~s) ..." (list x arg))]
+    [(instance-binding c t) (fmt "instance ~s" (list (->s-expr ne le (constraint c t))))]
     [(mod-binding s) (fmt "module ~s : ~s" (list x (->s-expr ne le s)))]
     [(sig-binding s) (fmt "signature ~s = ~s" (list x (->s-expr ne le s)))]))

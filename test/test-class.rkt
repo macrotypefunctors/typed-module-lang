@@ -1,5 +1,13 @@
 #lang s-exp typed-module-lang/core-lang
 
+;; Do not call until the instances are set up
+(val f : (-> Int) =
+     (λ ()
+       ((resolve (inst if* Bool Int))
+        #t
+        (λ () ((resolve (inst if* Int Int)) 0 (λ () 5) (λ () 6)))
+        (λ () 7))))
+
 (class (Condition B)
   [test : (-> B Bool)])
 
@@ -22,9 +30,17 @@
         (λ () 7))
        = 5)
 
-#;
+
 (instance (Condition Int)
   [test = (λ ([x : Int]) (if (= x 0) #f #t))])
+
+(check ((resolve (inst if* Bool Int))
+        #t
+        (λ () ((resolve (inst if* Int Int)) 0 (λ () 5) (λ () 6)))
+        (λ () 7))
+       = 6)
+
+(check (f) = 6)
 
 #;
 (instance (Condition A) => (Condition (-> A))

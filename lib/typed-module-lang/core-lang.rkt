@@ -8,6 +8,7 @@
          type
          newtype
          class
+         instance
          check
          #%var
          (rename-out
@@ -89,7 +90,7 @@
    (define class (label-reference (lookup-label G #'class-name)))
    (define dke G)
    (define τ_con (expand-type/dke dke #'con-type))
-   (define dict-id (generate-temporary #'inst))
+   (define dict-id (generate-temporary 'inst))
    (define G+instance
      (extend G (list (list dict-id (instance-binding class τ_con)))))
    (ec G+instance ⊢e #'body ≫ #'body- ⇒ τ_b)
@@ -310,13 +311,17 @@
 (define-typed-syntax instance
   #:datum-literals [=]
   ;; pass 1
-  [⊢≫decl-kinds⇒ [⊢ stx] (er ⊢≫decl-kinds⇒ ≫ stx decl-kinds⇒ '())]
+  [⊢≫decl-kinds⇒
+   [⊢ #'(hd . rst)]
+   #:with dict-id (generate-temporary 'inst)
+   (er ⊢≫decl-kinds⇒
+       ≫ (syntax/loc this-syntax (hd dict-id . rst))
+       decl-kinds⇒ (list (list (syntax-local-introduce #'dict-id) 'instance)))]
 
   ;; pass 2
   [⊢≫decl⇒
-   [dke ⊢ #'(_ (class-name:id type-constrained:expr)
+   [dke ⊢ #'(_ dict-id (class-name:id type-constrained:expr)
                m:method-impl ...)]
-   #:with dict-id (generate-temporary #'class-name)
    #:do [(define class-label (lookup-label dke #'class-name))
          (define c (label-reference class-label))
          (define τ (expand-type/dke dke #'type-constrained))]
@@ -339,7 +344,10 @@
          ;; 'val' implementation uses similar technique
          (define c (expand-type #'c-stx))
          (define τ (expand-type #'τ-stx))
-         (define-values [class-arg class-methods] 'unimplemented)]
+         (match-define (typeclass-binding class-arg class-methods)
+           (match c
+             [(label-reference l)
+              (lenv-lookup-typeclass (env-label-env G) l)]))]
 
    #:with [m.body- ...] (for/list ([m-stx (in-list (attribute m))]
                                    [m-name (in-list (attribute m.name))]
@@ -350,12 +358,12 @@
                                               "method not defined in class"
                                               m-stx))))
                           (define m-τ*
-                            (type-substitute* m-type (list class-arg) (list τ)))
+                            (type-substitute* m-τ (list class-arg) (list τ)))
                           (ec G ⊢e m-body ≫ m-body- ⇐ m-τ*)
                           m-body-)
 
    #:with [[k/v ...] ...] #'[['m.name m.body-] ...]
-   (er ⊢≫val-def⇐ ≫ #'(define dict-id (hash k/v ...)))])
+   (er ⊢≫val-def⇐ ≫ #'(define dict-id (hash k/v ... ...)))])
 
 
 (define-for-syntax (prettify/#%dot dat)

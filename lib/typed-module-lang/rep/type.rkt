@@ -31,6 +31,7 @@
 ;;   - 'type
 ;;   - 'val
 ;;   - 'class
+;;   - 'instance
 ;;   - EnvBinding
 
 ;; a Lenv is a [Lenvof EnvBinding]
@@ -53,10 +54,16 @@
     [(type-binding td) td]
     [_ #f]))
 
-;; Lenv Id -> Type or #f
+;; Lenv Label -> Type or #f
 (define (lenv-lookup-val G x)
   (match (label-env-lookup G x)
     [(val-binding τ) τ]
+    [_ #f]))
+
+;; Lenv Label -> TypeclassBinding or #f
+(define (lenv-lookup-typeclass G x)
+  (match (label-env-lookup G x)
+    [(? typeclass-binding? b) b]
     [_ #f]))
 
 ;; ------------------------------------------------------

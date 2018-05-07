@@ -21,6 +21,11 @@
   (match-define (env bs le _) G)
   (lenv-lookup-val le (binding-store-lookup bs x)))
 
+;; Env Id -> TypeclassBinding or #f
+(define (env-lookup-typeclass G x)
+  (match-define (env bs le _) G)
+  (lenv-lookup-typeclass le (binding-store-lookup bs x)))
+
 ;; Env Type Type -> Bool
 (define (subtype? G τ1 τ2)
   (match-define (env bs le _) G)

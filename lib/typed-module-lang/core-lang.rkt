@@ -93,7 +93,7 @@
    (define G+instance
      (extend G (list (list dict-id (instance-binding class τ_con)))))
    (ec G+instance ⊢e #'body ≫ #'body- ⇒ τ_b)
-   (er ⊢e≫⇒ ≫ #'(λ (dict-id) body-)
+   (er ⊢e≫⇒ ≫ #`(λ (#,dict-id) body-)
        ⇒ (Qual (constraint class τ_con) τ_b))])
 
 
@@ -554,8 +554,8 @@
            (format "cannot resolve instance ~a"
                    (constraint->string G constr))
            #'e)]
-     [inst-id
-      (er ⊢e≫⇒ ≫ #'(#%app e- inst-id) ⇒ τ_inside)])])
+     [(? identifier? inst-id)
+      (er ⊢e≫⇒ ≫ #`(#%app e- #,inst-id) ⇒ τ_inside)])])
 
 ;; ---------------------------------------------------------
 

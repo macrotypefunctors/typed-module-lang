@@ -105,8 +105,9 @@
                 [τb-body* (type-substitute-label* G Ys common-labels)])
           (recur-subtype? G+common τa-body* τb-body*)))]
 
-    [[(Qual (constraint con1 τa-con) τa-body) (Qual (constraint con2 τb-con) τb-body)]
-     #:when (label=? con1 con2)
+    [[(Qual (constraint class-a τa-con) τa-body)
+      (Qual (constraint class-b τb-con) τb-body)]
+     #:when (class=? G class-a class-b)
      (and (recur-subtype? G τa-con τb-con) ; the constrained type is invariant
           (recur-subtype? G τb-con τa-con)
           (recur-subtype? G τa-body τb-body))]
@@ -142,6 +143,10 @@
   (and (subtype? G τ1 τ2)
        (subtype? G τ2 τ1)))
 
+;; Env Class Class -> Boolean
+(define (class=? G c1 c2)
+  ;; TODO: change this to allow /recur ability
+  (type=? G c1 c2))
 
 ;; ---------------------------------------------------------
 

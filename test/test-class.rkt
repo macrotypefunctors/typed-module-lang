@@ -13,9 +13,14 @@
             (thn)
             (els))))))
 
-#;
 (instance (Condition Bool)
   [test = (λ ([x : Bool]) x)])
+
+(check ((resolve (inst if* Bool Int))
+        #t
+        (λ () 5)
+        (λ () 7))
+       = 5)
 
 #;
 (instance (Condition Int)

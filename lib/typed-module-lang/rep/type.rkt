@@ -88,10 +88,24 @@
 
 (struct constraint [class type] #:prefab)
 
+;; Lenv Type -> Type
+(define (dereference-type G τ)
+  (dereference-type/recur G τ dereference-type))
+
+;; Lenv Type [Lenv Type -> Type] -> Type
+(define (dereference-type/recur G τ rec)
+  (match τ
+    [(label-reference label)
+     (match (lenv-lookup-type-decl G label)
+       [(type-alias-decl τ*) (rec G τ*)]
+       [_ τ])]
+    [_ τ]))
+
+;; Lenv Type Type -> Bool
 (define (subtype? G τ1 τ2)
   (subtype?/recur G τ1 τ2 subtype?))
 
-;; Env Type Type [Env Type Type -> Boolean] -> Boolean
+;; Lenv Type Type [Lenv Type Type -> Boolean] -> Boolean
 (define (subtype?/recur G A B recur-subtype?)
   (match* [A B]
     [[(Arrow τa-ins τa-out) (Arrow τb-ins τb-out)]
@@ -154,6 +168,34 @@
 (define (class=? G c1 c2)
   ;; TODO: change this to allow /recur ability
   (type=? G c1 c2))
+
+;; ---------------------------------------------------------
+
+;; An InstanceContext is a
+;;   [Listof [List InstanceBinding Id]]
+
+(define (type-instance-context/recur G τ rec)
+  (match (dereference-type G τ)
+    [(Int) '()]       ; Int, Bool, and Arrow are all defined
+    [(Bool) '()]      ; in the "top-level" instance context,
+    [(Arrow _ _) '()] ; which contains nothing.
+    [(Forall Xs body)
+     (define G*
+       (label-env-extend
+        G
+        (map (λ (x) (list x (type-binding (type-opaque-decl))))
+             Xs)))
+     (rec G* body)]
+
+    ;; TODO: what does Qual mean here?
+
+    [(label-reference label)
+     ;; since this label was the output of dereference-type,
+     ;; it must be bound to an type-opaque-decl in the
+     ;; current environment G
+
+     ;; Find all the instances in G
+     ('find-all-the-instances-in-G)]))
 
 ;; ---------------------------------------------------------
 

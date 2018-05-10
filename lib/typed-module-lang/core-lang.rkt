@@ -91,8 +91,11 @@
    (define dke G)
    (define τ_con (expand-type/dke dke #'con-type))
    (define dict-id (generate-temporary 'inst))
+   ;; TODO: check that it's not an orphan
    (define G+instance
-     (extend G (list (list dict-id (instance-binding class τ_con)))))
+     (extend-current-instance-context
+      G
+      (list (list (instance-binding class τ_con) dict-id))))
    (ec G+instance ⊢e #'body ≫ #'body- ⇒ τ_b)
    (er ⊢e≫⇒ ≫ #`(λ (#,dict-id) body-)
        ⇒ (Qual (constraint class τ_con) τ_b))])
@@ -149,7 +152,11 @@
     (define env+external
       ;; note: important that 'envl' entries are "closer"
       ;;   than entries in 'external-G'
-      (replace dke+external envl*))
+      (extend-current-instance-context
+       (replace dke+external envl*)
+       (for/list ([ent (in-list envl*)]
+                  #:when (instance-binding? (second ent)))
+         (list (second ent) (first ent)))))
     ;; pass 3
     (define ds/3
       (for/list ([d (in-list ds/2)])

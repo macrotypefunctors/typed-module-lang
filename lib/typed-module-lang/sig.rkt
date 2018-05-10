@@ -14,28 +14,28 @@
 ;; Env Id -> Signature or #f
 ;; return signature of module with given name
 (define (env-lookup-module G x)
-  (match-define (env bs le _) G)
+  (match-define (env bs le _ _) G)
   (lenv-lookup-module le (binding-store-lookup bs x)))
 
 ;; Env Id -> Signature or #f
 ;; return signature defined by given name
 (define (env-lookup-signature G x)
-  (match-define (env bs le _) G)
+  (match-define (env bs le _ _) G)
   (lenv-lookup-signature le (binding-store-lookup bs x)))
 
 ;; Env ModPath Symbol -> SigEntry or #f
 (define (mod-path-lookup G path y)
-  (match-define (env bs le _) G)
+  (match-define (env bs le _ _) G)
   (lenv-mod-path-lookup le path y))
 
 ;; Env Type Type -> Bool
 (define (type-matches? G τ1 τ2)
-  (match-define (env bs le _) G)
+  (match-define (env bs le _ _) G)
   (ltype-matches? le τ1 τ2))
 
 ;; Env Signature Signature -> Bool
 (define (signature-matches? G s1 s2)
-  (match-define (env bs le _) G)
+  (match-define (env bs le _ _) G)
   (lsignature-matches? le s1 s2))
 
 ;; Env Bindings -> Sig

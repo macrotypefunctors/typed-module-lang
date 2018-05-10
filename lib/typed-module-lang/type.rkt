@@ -13,26 +13,26 @@
 
 ;; Env Id -> TypeDecl or #f
 (define (env-lookup-type-decl G X)
-  (match-define (env bs le _) G)
+  (match-define (env bs le _ _) G)
   (lenv-lookup-type-decl le (binding-store-lookup bs X)))
 
 ;; Env Id -> Type or #f
 (define (env-lookup-val G x)
-  (match-define (env bs le _) G)
+  (match-define (env bs le _ _) G)
   (lenv-lookup-val le (binding-store-lookup bs x)))
 
 ;; Env Id -> TypeclassBinding or #f
 (define (env-lookup-typeclass G x)
-  (match-define (env bs le _) G)
+  (match-define (env bs le _ _) G)
   (lenv-lookup-typeclass le (binding-store-lookup bs x)))
 
 ;; Env Type Type -> Bool
 (define (subtype? G τ1 τ2)
-  (match-define (env bs le _) G)
+  (match-define (env bs le _ _) G)
   (lsubtype? le τ1 τ2))
 
 ;; Env Type Type -> Bool
 (define (type=? G τ1 τ2)
-  (match-define (env bs le _) G)
+  (match-define (env bs le _ _) G)
   (ltype=? le τ1 τ2))
 
